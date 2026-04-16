@@ -29,8 +29,174 @@ export const createControlLogLine = (
 export const trimControlLogLines = (lines: ControlLogLine[], max = CONTROL_MAX_LOG_LINES) =>
   lines.length > max ? lines.slice(-max) : lines;
 
-export const normalizeControlOutputLog = (raw?: string | null) =>
-  String(raw ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+const ensureTerminalLine = (lines: string[][], row: number) => {
+  while (lines.length <= row) {
+    lines.push([]);
+  }
+  return lines[row];
+};
+
+const padTerminalLineToCursor = (line: string[], cursorColumn: number) => {
+  while (line.length < cursorColumn) {
+    line.push(" ");
+  }
+};
+
+const parseTerminalControlParameter = (value: string, fallback: number) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const eraseTerminalLine = (line: string[], cursorColumn: number, parameter: string) => {
+  const mode = parseTerminalControlParameter(parameter, 0);
+
+  if (mode === 1) {
+    for (let index = 0; index < Math.min(cursorColumn, line.length); index += 1) {
+      line[index] = " ";
+    }
+    return;
+  }
+
+  if (mode === 2) {
+    line.length = 0;
+    return;
+  }
+
+  line.length = Math.min(cursorColumn, line.length);
+};
+
+const TRANSIENT_TERMINAL_PROMPT_LINE = /^\s*(?:>|\$|#)\s*$/;
+
+// Convert raw outputlog snapshots into a readable terminal transcript.
+const renderTerminalSnapshot = (raw?: string | null) => {
+  const source = String(raw ?? "").replace(/\r\n/g, "\n");
+  const lines: string[][] = [[]];
+  let row = 0;
+  let column = 0;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (char === "\x1b") {
+      const nextChar = source[index + 1];
+
+      if (nextChar === "[") {
+        let sequenceEnd = index + 2;
+        while (sequenceEnd < source.length) {
+          const code = source.charCodeAt(sequenceEnd);
+          if (code >= 0x40 && code <= 0x7e) break;
+          sequenceEnd += 1;
+        }
+
+        if (sequenceEnd >= source.length) break;
+
+        const command = source[sequenceEnd];
+        const parameterText = source.slice(index + 2, sequenceEnd);
+        const parameters = parameterText.split(";");
+        const currentLine = ensureTerminalLine(lines, row);
+
+        switch (command) {
+          case "K":
+            eraseTerminalLine(currentLine, column, parameters[0] || "0");
+            break;
+          case "G":
+            column = Math.max(0, parseTerminalControlParameter(parameters[0], 1) - 1);
+            break;
+          case "C":
+            column += Math.max(0, parseTerminalControlParameter(parameters[0], 1));
+            break;
+          case "D":
+            column = Math.max(0, column - Math.max(0, parseTerminalControlParameter(parameters[0], 1)));
+            break;
+          case "P": {
+            const deleteCount = Math.max(0, parseTerminalControlParameter(parameters[0], 1));
+            currentLine.splice(column, deleteCount);
+            break;
+          }
+          case "J": {
+            const mode = parseTerminalControlParameter(parameters[0], 0);
+            if (mode === 2 || mode === 3) {
+              lines.length = 1;
+              lines[0] = [];
+              row = 0;
+              column = 0;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+
+        index = sequenceEnd;
+        continue;
+      }
+
+      if (nextChar === "]") {
+        let sequenceEnd = index + 2;
+        while (sequenceEnd < source.length) {
+          if (source[sequenceEnd] === "\u0007") break;
+          if (source[sequenceEnd] === "\x1b" && source[sequenceEnd + 1] === "\\") {
+            sequenceEnd += 1;
+            break;
+          }
+          sequenceEnd += 1;
+        }
+        index = sequenceEnd;
+        continue;
+      }
+
+      if (nextChar) {
+        index += 1;
+      }
+      continue;
+    }
+
+    if (char === "\n") {
+      row += 1;
+      column = 0;
+      ensureTerminalLine(lines, row);
+      continue;
+    }
+
+    if (char === "\r") {
+      column = 0;
+      continue;
+    }
+
+    if (char === "\b") {
+      column = Math.max(0, column - 1);
+      continue;
+    }
+
+    if (char === "\t") {
+      const currentLine = ensureTerminalLine(lines, row);
+      const remainder = column % 4;
+      const spaces = remainder === 0 ? 4 : 4 - remainder;
+      padTerminalLineToCursor(currentLine, column);
+      for (let spaceIndex = 0; spaceIndex < spaces; spaceIndex += 1) {
+        currentLine[column] = " ";
+        column += 1;
+      }
+      continue;
+    }
+
+    if (char.charCodeAt(0) < 0x20) {
+      continue;
+    }
+
+    const currentLine = ensureTerminalLine(lines, row);
+    padTerminalLineToCursor(currentLine, column);
+    currentLine[column] = char;
+    column += 1;
+  }
+
+  return lines
+    .map((line) => line.join("").replace(/\s+$/g, ""))
+    .filter((line) => !TRANSIENT_TERMINAL_PROMPT_LINE.test(line))
+    .join("\n");
+};
+
+export const normalizeControlOutputLog = (raw?: string | null) => renderTerminalSnapshot(raw);
 
 export const splitControlOutputLog = (raw?: string | null) => {
   const lines = normalizeControlOutputLog(raw).split("\n");

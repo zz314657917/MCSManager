@@ -330,6 +330,232 @@ declare global {
     >;
   }
 
+  type IMcsmGmChatPluginType = "playerchat" | "native";
+
+  type IMcsmGmActionKind =
+    | "economy_deposit"
+    | "economy_withdraw"
+    | "points_give"
+    | "points_take"
+    | "lp_group_add"
+    | "lp_group_switch"
+    | "lp_group_remove"
+    | "lp_permission_set"
+    | "lp_permission_unset"
+    | "lp_temp_group_add"
+    | "lp_temp_group_remove"
+    | "lp_temp_permission_set"
+    | "lp_temp_permission_unset"
+    | "chat_mute"
+    | "chat_unmute";
+
+  interface IMcsmGmControllerInfo {
+    host: string;
+    port: number;
+  }
+
+  interface IMcsmGmPlayerPresence {
+    daemonId: string;
+    daemonDisplayName: string;
+    instanceId: string;
+    instanceDisplayName: string;
+    playerUuid: string;
+    playerName: string;
+    online: boolean;
+    lastSeenAt: string;
+  }
+
+  interface IMcsmGmPlayerBalances {
+    economyAvailable: boolean;
+    economyBalance?: number;
+    pointsAvailable: boolean;
+    pointsBalance?: number;
+    updatedAt?: string;
+  }
+
+  interface IMcsmGmModerationStatus {
+    chatPluginAvailable: boolean;
+    chatPluginType: IMcsmGmChatPluginType;
+    muted: boolean;
+    remainingSeconds?: number;
+    expireAt?: string;
+    reason?: string;
+    operatorName?: string;
+    updatedAt?: string;
+  }
+
+  interface IMcsmLuckPermsGroupGrant {
+    name: string;
+    temporary: boolean;
+    expiresAt?: string;
+  }
+
+  interface IMcsmLuckPermsPermissionGrant {
+    node: string;
+    value: boolean;
+    temporary: boolean;
+    expiresAt?: string;
+  }
+
+  interface IMcsmLuckPermsSnapshot {
+    available: boolean;
+    primaryGroup?: string;
+    availableGroups: string[];
+    groups: IMcsmLuckPermsGroupGrant[];
+    permissions: IMcsmLuckPermsPermissionGrant[];
+    updatedAt?: string;
+  }
+
+  interface IMcsmGmPlayerSnapshot {
+    presence: IMcsmGmPlayerPresence;
+    balances: IMcsmGmPlayerBalances;
+    luckPerms: IMcsmLuckPermsSnapshot;
+    moderation: IMcsmGmModerationStatus;
+  }
+
+  interface IMcsmGmChatMessage {
+    id: string;
+    daemonId: string;
+    instanceId: string;
+    playerUuid?: string;
+    playerName?: string;
+    senderType: "player" | "system" | "gm";
+    channel?: string;
+    tellPlayerName?: string;
+    mentionedPlayers?: string[];
+    source?: string;
+    text: string;
+    time: string;
+  }
+
+  interface IMcsmGmDependencySnapshot {
+    economyAvailable: boolean;
+    pointsAvailable: boolean;
+    luckPermsAvailable: boolean;
+    chatPluginAvailable: boolean;
+    chatPluginType: IMcsmGmChatPluginType;
+    controller?: IMcsmGmControllerInfo;
+    updatedAt?: string;
+  }
+
+  interface IMcsmGmOverviewServer {
+    daemonId: string;
+    daemonDisplayName: string;
+    daemonAvailable: boolean;
+    daemonEndpoint: string;
+    instanceId: string;
+    instanceDisplayName: string;
+    instanceStatus: number;
+    playerCount: number;
+    chatMessagesToday: number;
+    dependencies: IMcsmGmDependencySnapshot;
+  }
+
+  interface IMcsmGmOverviewNode {
+    daemonId: string;
+    daemonDisplayName: string;
+    daemonAvailable: boolean;
+    daemonEndpoint: string;
+    instances: IMcsmGmOverviewServer[];
+  }
+
+  interface IMcsmGmOverviewResponse {
+    generatedAt: number;
+    nodes: IMcsmGmOverviewNode[];
+    servers: IMcsmGmOverviewServer[];
+  }
+
+  type IMcsmGmActionRequest =
+    | {
+        kind: "economy_deposit" | "economy_withdraw";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        amount: number;
+      }
+    | {
+        kind: "points_give" | "points_take";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        amount: number;
+      }
+    | {
+        kind: "lp_group_add" | "lp_group_switch" | "lp_group_remove";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        group: string;
+      }
+    | {
+        kind: "lp_permission_set" | "lp_permission_unset";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        node: string;
+      }
+    | {
+        kind: "lp_temp_group_add" | "lp_temp_group_remove";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        group: string;
+        duration: string;
+      }
+    | {
+        kind: "lp_temp_permission_set" | "lp_temp_permission_unset";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        node: string;
+        duration: string;
+      }
+    | {
+        kind: "chat_mute";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        durationSeconds: number;
+        reason?: string;
+      }
+    | {
+        kind: "chat_unmute";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+      };
+
+  interface IMcsmGmActionResult {
+    success: boolean;
+    kind: IMcsmGmActionKind;
+    daemonId: string;
+    instanceId: string;
+    playerUuid: string;
+    playerName?: string;
+    message: string;
+    beforeValue?: number;
+    afterValue?: number;
+    balances?: IMcsmGmPlayerBalances;
+    luckPerms?: IMcsmLuckPermsSnapshot;
+    moderation?: IMcsmGmModerationStatus;
+    updatedAt: string;
+  }
+
+  interface IMcsmGmAuditRecord {
+    id: string;
+    operatorName: string;
+    daemonId: string;
+    instanceId: string;
+    playerUuid: string;
+    playerName: string;
+    actionKind: string;
+    success: boolean;
+    message: string;
+    beforeValue?: number;
+    afterValue?: number;
+    time: string;
+  }
+
   interface IJsonData {
     [key: string]: any;
   }

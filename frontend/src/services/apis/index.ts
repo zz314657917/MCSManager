@@ -207,6 +207,111 @@ export const monitorOverview = useDefineApi<any, IMcsmMonitorOverviewResponse>({
   method: "GET"
 });
 
+export const gmServersApi = useDefineApi<any, IMcsmGmOverviewResponse>({
+  url: "/api/gm/servers",
+  method: "GET"
+});
+
+export const gmPlayersApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+    };
+  },
+  IMcsmGmPlayerPresence[]
+>({
+  url: "/api/gm/:daemonId/:instanceId/players",
+  method: "GET"
+});
+
+export const gmChatApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      cursor?: string;
+      limit?: number;
+      playerUuid?: string;
+    };
+  },
+  {
+    items: IMcsmGmChatMessage[];
+    nextCursor?: string;
+    hasMore?: boolean;
+  }
+>({
+  url: "/api/gm/:daemonId/:instanceId/chat",
+  method: "GET"
+});
+
+export const gmBalancesApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      playerUuid: string;
+    };
+  },
+  IMcsmGmPlayerBalances
+>({
+  url: "/api/gm/:daemonId/:instanceId/players/:playerUuid/balances",
+  method: "GET"
+});
+
+export const gmLuckPermsApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      playerUuid: string;
+    };
+  },
+  IMcsmLuckPermsSnapshot
+>({
+  url: "/api/gm/:daemonId/:instanceId/players/:playerUuid/luckperms",
+  method: "GET"
+});
+
+export const gmModerationApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      playerUuid: string;
+    };
+  },
+  IMcsmGmModerationStatus
+>({
+  url: "/api/gm/:daemonId/:instanceId/players/:playerUuid/moderation",
+  method: "GET"
+});
+
+export const gmExecuteActionApi = useDefineApi<
+  {
+    data: IMcsmGmActionRequest;
+  },
+  IMcsmGmActionResult
+>({
+  url: "/api/gm/actions/execute",
+  method: "POST"
+});
+
+export const gmAuditApi = useDefineApi<
+  {
+    params: {
+      daemonId?: string;
+      instanceId?: string;
+      playerUuid?: string;
+      limit?: number;
+    };
+  },
+  IMcsmGmAuditRecord[]
+>({
+  url: "/api/gm/audit",
+  method: "GET"
+});
+
 export const editNode = useDefineApi<
   {
     params: {

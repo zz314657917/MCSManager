@@ -7,6 +7,7 @@ import { globalConfiguration } from "../entity/config";
 import FileWriter from "../entity/file_writer";
 import { $t } from "../i18n";
 import { missionPassport } from "../service/mission_passport";
+import gmService from "../service/gm_service";
 import monitorService from "../service/monitor_service";
 import FileManager from "../service/system_file";
 import InstanceSubsystem from "../service/system_instance";
@@ -15,6 +16,7 @@ import { clearUploadFiles } from "../tools/filepath";
 import { sendFile } from "../utils/speed_limit";
 
 const router = new Router();
+type AnyRecord = Record<string, any>;
 
 // Define the HTTP home page display route
 router.all("/", async (ctx) => {
@@ -42,6 +44,41 @@ router.post("/v1/plugin/heartbeat", async (ctx) => {
       data: error?.message || String(error)
     };
   }
+});
+
+const handlePluginBody = async (
+  ctx: Router.RouterContext,
+  executor: (body: AnyRecord) => Promise<any> | any
+) => {
+  try {
+    const result = await executor(ctx.request.body as AnyRecord);
+    ctx.body = {
+      status: 200,
+      data: result
+    };
+  } catch (error: any) {
+    ctx.status = Number(error?.status) || 400;
+    ctx.body = {
+      status: ctx.status,
+      data: error?.message || String(error)
+    };
+  }
+};
+
+router.post("/v1/plugin/player_snapshot", async (ctx) => {
+  await handlePluginBody(ctx, (body) => gmService.recordPlayerSnapshot(body));
+});
+
+router.post("/v1/plugin/gm/player-snapshot", async (ctx) => {
+  await handlePluginBody(ctx, (body) => gmService.recordPlayerSnapshot(body));
+});
+
+router.post("/v1/plugin/chat_message", async (ctx) => {
+  await handlePluginBody(ctx, (body) => gmService.recordChatMessage(body));
+});
+
+router.post("/v1/plugin/gm/chat-message", async (ctx) => {
+  await handlePluginBody(ctx, (body) => gmService.recordChatMessage(body));
 });
 
 router.get("/v1/plugin/token/:serverId", async (ctx) => {

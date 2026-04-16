@@ -75,6 +75,7 @@ export function navigation(socket: Socket) {
 import "../routers/auth_router";
 import "../routers/environment_router";
 import "../routers/file_router";
+import "../routers/gm_router";
 import "../routers/info_router";
 import "../routers/instance_event_router";
 import "../routers/Instance_router";

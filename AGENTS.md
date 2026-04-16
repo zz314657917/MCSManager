@@ -37,6 +37,31 @@
 - Linux 部署脚本在 `prod-scripts/linux/`；`deploy-monitor-daemon-from-repo.sh` 要求目标机已有官方 `/opt/mcsmanager/daemon` 基础安装。
 - 服务器上常见约定路径：源码仓库 `/root/MCSManager-monitor`，线上运行目录 `/opt/mcsmanager`。
 
+## AI 知识库约定
+
+本仓库已使用 `knowledge/` 作为 AI 可读知识库，新会话默认先阅读：
+
+1. `knowledge/00-start-here.md`
+2. `knowledge/01-project-map.md`
+3. `knowledge/02-dev-rules.md`
+4. `knowledge/03-build-and-verify.md`
+5. `knowledge/04-monitor-architecture.md`
+6. `knowledge/05-known-pitfalls.md`
+7. `knowledge/07-current-focus.md`
+
+遇到以下情况优先检索对应目录：
+
+- 前端监控页：`knowledge/frontend/`
+- Panel 聚合接口：`knowledge/panel/`
+- Daemon 监控采样：`knowledge/daemon/`
+- Minecraft 插件：`knowledge/plugin/`
+- MCP server：`knowledge/mcp/`
+- 报错、异常、兼容性问题：`knowledge/errors/`
+- 当前进行中的问题：`knowledge/tasks/current-task.md`
+
+当本次修改形成稳定结论、固定模式、已确认踩坑或重要设计取舍时，应回写到 `knowledge/`，而不是只留在对话历史中。
+不要把大段知识正文继续堆到 `AGENTS.md`；`AGENTS.md` 保持入口、约束和索引，细节放入知识库。
+
 ## 常用命令
 
 Windows PowerShell 下如果 `npm` 被执行策略拦截，使用 `npm.cmd`。

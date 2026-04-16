@@ -885,13 +885,6 @@ export function useControlPanelState() {
       });
       commandInput.value = "";
       appendLog(target, "command", `$ ${command}`);
-      appendLog(
-        target,
-        "info",
-        target.mode === "global"
-          ? `[global0001] command accepted: ${command}`
-          : `[${target.displayName}] command accepted: ${command}`
-      );
     } catch (error) {
       reportControlError(error, {
         fallbackText: t("TXT_CODE_CONTROL_COMMAND_FAILED"),

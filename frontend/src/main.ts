@@ -18,7 +18,9 @@ const getHashPath = () => {
   return rawHash.split("?")[0] || "/";
 };
 
-const isControlStandalonePreviewEntry = () => getHashPath() === "/control";
+const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/players"]);
+
+const isStandalonePreviewEntry = () => STANDALONE_PREVIEW_PATHS.has(getHashPath());
 
 const isBackendUnavailableError = (error: any) => {
   const message = String(error?.message || error).toLowerCase();
@@ -32,10 +34,10 @@ const isBackendUnavailableError = (error: any) => {
   );
 };
 
-async function initStandaloneControlPreview() {
+async function initStandalonePreview() {
   const { state, enableLocalPreviewAccess } = useAppStateStore();
   enableLocalPreviewAccess();
-  setLoadingTitle("Initializing Local Control Preview...");
+  setLoadingTitle("Initializing Local Operations Preview...");
   await initI18n(state.language);
   const module = await import("./mount");
   await module.mountApp();
@@ -55,9 +57,9 @@ async function initApp() {
     setLoadingTitle("Rendering Application...");
     await module.mountApp();
   } catch (error: any) {
-    if (isControlStandalonePreviewEntry() && isBackendUnavailableError(error)) {
+    if (isStandalonePreviewEntry() && isBackendUnavailableError(error)) {
       try {
-        await initStandaloneControlPreview();
+        await initStandalonePreview();
         return;
       } catch (previewError: any) {
         handleLoadingError(previewError);

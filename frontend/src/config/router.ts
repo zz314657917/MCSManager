@@ -2,6 +2,7 @@ import { $t as t } from "@/lang/i18n";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import type { LoginUserInfo } from "@/types/user";
 import ControlConsole from "@/views/ControlConsole.vue";
+import GMConsole from "@/views/GMConsole.vue";
 import InstallPage from "@/views/Install.vue";
 import LayoutContainer from "@/views/LayoutContainer.vue";
 import LoginPage from "@/views/Login.vue";
@@ -111,6 +112,36 @@ const originRouterConfig: RouterConfig[] = [
     path: "/control",
     name: t("TXT_CODE_CONTROL_TITLE"),
     component: ControlConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal"
+    }
+  },
+  {
+    path: "/gm",
+    name: "GM 管理",
+    component: GMConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal"
+    }
+  },
+  {
+    path: "/gm/chat",
+    name: "GM 聊天",
+    component: GMConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal"
+    }
+  },
+  {
+    path: "/players",
+    name: "GM Redirect",
+    redirect: "/gm",
     meta: {
       permission: ROLE.ADMIN,
       mainMenu: false,

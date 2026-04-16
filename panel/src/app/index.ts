@@ -10,6 +10,7 @@ import serviceRouter from "./routers/daemon_router";
 import alertRouter from "./routers/alert_router";
 import environmentRouter from "./routers/environment_router";
 import filemanager_router from "./routers/filemananger_router";
+import gmRouter from "./routers/gm_router";
 import lowUserRouter from "./routers/general_user_router";
 import instanceRouter from "./routers/instance_admin_router";
 import exchangeRouter from "./routers/instance_exchange_router";
@@ -41,6 +42,7 @@ export function mountRouters(app: Koa<Koa.DefaultState, Koa.DefaultContext>) {
   apiRouter.use(ssoRouter.routes()).use(ssoRouter.allowedMethods());
   apiRouter.use(environmentRouter.routes()).use(environmentRouter.allowedMethods());
   apiRouter.use(exchangeRouter.routes()).use(exchangeRouter.allowedMethods());
+  apiRouter.use(gmRouter.routes()).use(gmRouter.allowedMethods());
   apiRouter.use(javaManagerRouter.routes()).use(javaManagerRouter.allowedMethods());
   apiRouter.use(modManagerRouter.routes()).use(modManagerRouter.allowedMethods());
   apiRouter.use(monitorRouter.routes()).use(monitorRouter.allowedMethods());

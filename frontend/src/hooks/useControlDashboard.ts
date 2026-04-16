@@ -4,7 +4,12 @@ import { t } from "@/lang/i18n";
 import { formatMemoryUsage } from "@/tools/memory";
 import { parseTimestamp } from "@/tools/time";
 import { INSTANCE_STATUS, INSTANCE_STATUS_CODE } from "@/types/const";
-import type { ControlDashboardMetaItem, ControlDashboardMetric, ControlTarget } from "@/types/control";
+import type {
+  ControlDashboardMetaItem,
+  ControlDashboardMetric,
+  ControlDashboardMetricSegment,
+  ControlTarget
+} from "@/types/control";
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 
 const DASHBOARD_REFRESH_INTERVAL_MS = 5000;
@@ -14,11 +19,17 @@ const TIB = 1024 ** 4;
 type MonitorServerRecord = IMcsmMonitorOverviewResponse["servers"][number];
 type MonitorNodeRecord = IMcsmMonitorOverviewResponse["nodes"][number];
 
+type PreviewTpsMetrics = {
+  oneMin: number;
+  fiveMin: number;
+  fifteenMin: number;
+};
+
 type PreviewInstanceMetrics = {
   cpuPercent: number;
   memoryBytes: number;
   memoryPercent: number;
-  tps: number;
+  tps: PreviewTpsMetrics;
   onlinePlayers: number;
   maxPlayers: number;
   serverVersion: string;
@@ -39,7 +50,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 26.4,
     memoryBytes: Math.round(3.3 * GIB),
     memoryPercent: 31.2,
-    tps: 19.98,
+    tps: {
+      oneMin: 19.98,
+      fiveMin: 19.96,
+      fifteenMin: 19.93
+    },
     onlinePlayers: 18,
     maxPlayers: 80,
     serverVersion: "Paper 1.20.4"
@@ -48,7 +63,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 54.8,
     memoryBytes: Math.round(5.8 * GIB),
     memoryPercent: 48.6,
-    tps: 19.73,
+    tps: {
+      oneMin: 19.73,
+      fiveMin: 19.81,
+      fifteenMin: 19.88
+    },
     onlinePlayers: 42,
     maxPlayers: 100,
     serverVersion: "Paper 1.20.4"
@@ -57,7 +76,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 4.6,
     memoryBytes: Math.round(0.9 * GIB),
     memoryPercent: 12.4,
-    tps: 20,
+    tps: {
+      oneMin: 20,
+      fiveMin: 19.99,
+      fifteenMin: 19.98
+    },
     onlinePlayers: 63,
     maxPlayers: 120,
     serverVersion: "Velocity 3.3"
@@ -66,7 +89,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 21.9,
     memoryBytes: Math.round(2.4 * GIB),
     memoryPercent: 24.5,
-    tps: 19.99,
+    tps: {
+      oneMin: 19.99,
+      fiveMin: 19.97,
+      fifteenMin: 19.95
+    },
     onlinePlayers: 7,
     maxPlayers: 30,
     serverVersion: "Paper 1.20.4"
@@ -75,7 +102,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 46.3,
     memoryBytes: Math.round(6.7 * GIB),
     memoryPercent: 56.8,
-    tps: 19.41,
+    tps: {
+      oneMin: 19.41,
+      fiveMin: 19.58,
+      fifteenMin: 19.71
+    },
     onlinePlayers: 12,
     maxPlayers: 24,
     serverVersion: "Forge 1.20.1"
@@ -84,7 +115,11 @@ const previewInstanceMetricsMap: Record<string, PreviewInstanceMetrics> = {
     cpuPercent: 0,
     memoryBytes: 0,
     memoryPercent: 0,
-    tps: 0,
+    tps: {
+      oneMin: 0,
+      fiveMin: 0,
+      fifteenMin: 0
+    },
     onlinePlayers: 0,
     maxPlayers: 20,
     serverVersion: "Paper 1.20.4"
@@ -147,6 +182,11 @@ const formatLoad = (value?: number | null) => {
   return value.toFixed(2);
 };
 
+const formatTps = (value?: number | null) => {
+  if (value == null || Number.isNaN(value)) return "--";
+  return value.toFixed(2);
+};
+
 const formatUpdatedAt = (timestamp?: number) => parseTimestamp(timestamp ?? 0) || "--";
 
 const getPercentTone = (value?: number | null): ControlDashboardMetric["tone"] => {
@@ -177,6 +217,32 @@ const getPreviewInstanceMetrics = (target: ControlTarget) =>
   previewInstanceMetricsMap[makeTargetKey(target)];
 
 const getPreviewHostMetrics = (daemonId: string) => previewHostMetricsMap[daemonId];
+
+const buildTpsMetricSegments = (values?: {
+  oneMin?: number;
+  fiveMin?: number;
+  fifteenMin?: number;
+}): ControlDashboardMetricSegment[] | undefined => {
+  if (!values) return undefined;
+
+  return [
+    {
+      key: "1m",
+      label: t("TXT_CODE_CONTROL_1M_AVG"),
+      value: formatTps(values.oneMin)
+    },
+    {
+      key: "5m",
+      label: t("TXT_CODE_CONTROL_5M_AVG"),
+      value: formatTps(values.fiveMin)
+    },
+    {
+      key: "15m",
+      label: t("TXT_CODE_CONTROL_15M_AVG"),
+      value: formatTps(values.fifteenMin)
+    }
+  ];
+};
 
 const buildOfflineMetrics = (labels: string[]) =>
   labels.map<ControlDashboardMetric>((label, index) => ({
@@ -224,6 +290,15 @@ const buildInstanceMetricsFromPreview = (target: ControlTarget): ControlDashboar
     : isWarmingUp
       ? Math.max(base.memoryPercent * 0.52, 8)
       : undefined;
+  const effectiveTps = isRunning
+    ? base.tps
+    : isWarmingUp
+      ? {
+          oneMin: Number((base.tps.oneMin * 0.91).toFixed(2)),
+          fiveMin: Number((base.tps.fiveMin * 0.94).toFixed(2)),
+          fifteenMin: Number((base.tps.fifteenMin * 0.97).toFixed(2))
+        }
+      : undefined;
 
   return [
     {
@@ -243,9 +318,10 @@ const buildInstanceMetricsFromPreview = (target: ControlTarget): ControlDashboar
     {
       key: "tps",
       label: t("TXT_CODE_CONTROL_TPS"),
-      value: isRunning ? base.tps.toFixed(2) : "--",
-      detail: isRunning ? t("TXT_CODE_CONTROL_1M_AVG") : statusText,
-      tone: getTpsTone(isRunning ? base.tps : undefined)
+      value: effectiveTps ? formatTps(effectiveTps.oneMin) : "--",
+      detail: isRunning ? base.serverVersion : statusText,
+      tone: getTpsTone(effectiveTps?.oneMin),
+      segments: buildTpsMetricSegments(effectiveTps)
     },
     {
       key: "players",
@@ -327,6 +403,13 @@ const buildInstanceMetricsFromLive = (server: MonitorServerRecord): ControlDashb
   const statusText = getStatusText(server.status);
   const isRunning = server.processRunning;
   const memoryPercent = server.process.memoryPercent;
+  const tpsMetrics = server.plugin.online
+    ? {
+        oneMin: server.plugin.tps.oneMin,
+        fiveMin: server.plugin.tps.fiveMin,
+        fifteenMin: server.plugin.tps.fifteenMin
+      }
+    : undefined;
 
   return [
     {
@@ -346,9 +429,10 @@ const buildInstanceMetricsFromLive = (server: MonitorServerRecord): ControlDashb
     {
       key: "tps",
       label: t("TXT_CODE_CONTROL_TPS"),
-      value: server.plugin.online ? server.plugin.tps.oneMin.toFixed(2) : "--",
-      detail: server.plugin.online ? t("TXT_CODE_CONTROL_1M_AVG") : t("TXT_CODE_CONTROL_PLUGIN_OFFLINE"),
-      tone: getTpsTone(server.plugin.online ? server.plugin.tps.oneMin : undefined)
+      value: tpsMetrics ? formatTps(tpsMetrics.oneMin) : "--",
+      detail: server.plugin.online ? server.plugin.serverVersion || statusText : t("TXT_CODE_CONTROL_PLUGIN_OFFLINE"),
+      tone: getTpsTone(tpsMetrics?.oneMin),
+      segments: buildTpsMetricSegments(tpsMetrics)
     },
     {
       key: "players",

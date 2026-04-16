@@ -23,12 +23,19 @@ export interface ControlLogLine {
 
 export type ControlDashboardMetricTone = "default" | "success" | "warning" | "danger" | "muted";
 
+export interface ControlDashboardMetricSegment {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export interface ControlDashboardMetric {
   key: string;
   label: string;
   value: string;
   detail: string;
   tone: ControlDashboardMetricTone;
+  segments?: ControlDashboardMetricSegment[];
 }
 
 export interface ControlDashboardMetaItem {
