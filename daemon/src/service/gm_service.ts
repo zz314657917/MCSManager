@@ -89,6 +89,8 @@ const normalizeIsoTime = (value?: number | string) => {
 const normalizeChatPluginType = (supports?: AnyRecord): IMcsmGmChatPluginType =>
   supports?.playerChatReflection ? "playerchat" : "native";
 
+const INVENTORY_SECTIONS = new Set(["hotbar", "main", "armor", "offhand"]);
+
 const normalizeControllerHost = (value: unknown) => {
   const host = normalizeText(value);
   if (!host || host === "0.0.0.0" || host === "::" || host === "::1") {
@@ -503,6 +505,95 @@ class GmService {
     };
   }
 
+  private async queryInventory(instanceId: string, playerUuid: string): Promise<IMcsmGmPlayerInventorySnapshot> {
+    const { snapshot } = this.ensureSnapshotOrThrow(instanceId);
+    const player = snapshot.players.find((item) => item.playerUuid === playerUuid);
+    if (!player) {
+      const error: any = new Error("Player is not present in the current GM snapshot.");
+      error.status = 404;
+      throw error;
+    }
+    if (!player.online) {
+      const error: any = new Error("Player must be online to read inventory.");
+      error.status = 409;
+      throw error;
+    }
+
+    const result = await this.callController(instanceId, {
+      action: "inventory",
+      operation: "snapshot",
+      playerUuid
+    });
+    if (!result.ok || result.statusCode >= 400) {
+      const error: any = new Error(result.message || "Inventory snapshot query failed.");
+      error.status = result.statusCode || 503;
+      throw error;
+    }
+
+    const slots = Array.isArray(result.data.slots)
+      ? result.data.slots
+          .map((item: AnyRecord) => {
+            const section = normalizeText(item.section);
+            if (!INVENTORY_SECTIONS.has(section)) return null;
+
+            const slot = Math.max(0, normalizeNumber(item.slot, 0));
+            const empty = Boolean(item.empty);
+            const material = normalizeText(item.material) || undefined;
+            const rawTypeName = normalizeText(item.rawTypeName) || undefined;
+            const amount = empty ? undefined : Math.max(0, normalizeNumber(item.amount, 0));
+            const durability =
+              item.durability == null ? undefined : Math.max(0, normalizeNumber(item.durability, 0));
+            const maxDurability =
+              item.maxDurability == null ? undefined : Math.max(0, normalizeNumber(item.maxDurability, 0));
+            const displayName = normalizeText(item.displayName) || undefined;
+            const lore = Array.isArray(item.lore)
+              ? item.lore.map((line: unknown) => normalizeText(line)).filter(Boolean)
+              : undefined;
+            const enchants = Array.isArray(item.enchants)
+              ? item.enchants
+                  .map((enchant: AnyRecord) => {
+                    const key = normalizeText(enchant.key);
+                    if (!key) return null;
+                    return {
+                      key,
+                      level: Math.max(0, normalizeNumber(enchant.level, 0))
+                    } satisfies IMcsmGmInventoryEnchant;
+                  })
+                  .filter(Boolean) as IMcsmGmInventoryEnchant[]
+              : undefined;
+            const itemFlags = Array.isArray(item.itemFlags)
+              ? item.itemFlags.map((flag: unknown) => normalizeText(flag)).filter(Boolean)
+              : undefined;
+
+            return {
+              section: section as IMcsmGmInventorySlot["section"],
+              slot,
+              empty,
+              material,
+              rawTypeName,
+              amount,
+              durability,
+              maxDurability,
+              displayName,
+              lore,
+              enchants,
+              itemFlags
+            } satisfies IMcsmGmInventorySlot;
+          })
+          .filter(Boolean) as IMcsmGmInventorySlot[]
+      : [];
+
+    return {
+      available: true,
+      playerUuid,
+      playerName: normalizeText(result.data.playerName) || player.playerName,
+      online: result.data.online !== false,
+      source: "bukkit",
+      updatedAt: normalizeIsoTime(result.data.updatedAt),
+      slots
+    };
+  }
+
   public recordPlayerSnapshot(payload: IPlayerSnapshotPayload) {
     const serverId = normalizeText(payload.serverId);
     const instanceToken = normalizeText(payload.instanceToken);
@@ -671,6 +762,10 @@ class GmService {
 
   public async getModeration(instanceId: string, playerUuid: string) {
     return this.queryModeration(instanceId, playerUuid);
+  }
+
+  public async getInventory(instanceId: string, playerUuid: string) {
+    return this.queryInventory(instanceId, playerUuid);
   }
 
   public async executeAction(request: IMcsmGmActionRequest): Promise<IMcsmGmActionResult> {

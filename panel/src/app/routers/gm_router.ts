@@ -204,6 +204,21 @@ router.get(
   }
 );
 
+router.get(
+  "/:daemonId/:instanceId/players/:playerUuid/inventory",
+  permission({ level: ROLE.ADMIN }),
+  async (ctx) => {
+    try {
+      ctx.body = await requestRemote<IMcsmGmPlayerInventorySnapshot>(ctx.params.daemonId, "gm/inventory", {
+        instanceId: ctx.params.instanceId,
+        playerUuid: ctx.params.playerUuid
+      });
+    } catch (error) {
+      handleRouteError(ctx, error);
+    }
+  }
+);
+
 router.post("/actions/execute", permission({ level: ROLE.ADMIN }), async (ctx) => {
   const request = ctx.request.body as IMcsmGmActionRequest;
   if (!request?.daemonId || !request?.instanceId || !request?.playerUuid || !request?.kind) {

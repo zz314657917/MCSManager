@@ -5,6 +5,7 @@ com\mcsmanager\monitor\LuckPermsAdapter.class
 com\mcsmanager\monitor\PlayerSnapshotReporter$2.class
 com\mcsmanager\monitor\ChatReporter$2.class
 com\mcsmanager\monitor\MinecraftMonitorPlugin$1.class
+com\mcsmanager\monitor\InventorySnapshotAdapter$1.class
 com\mcsmanager\monitor\ControlActionDispatcher.class
 com\mcsmanager\monitor\MuteService$1.class
 com\mcsmanager\monitor\AgentHttpClient$1.class
@@ -37,5 +38,6 @@ com\mcsmanager\monitor\MinecraftMonitorPlugin.class
 com\mcsmanager\monitor\LocalControlServer$1.class
 com\mcsmanager\monitor\LuckPermsAdapter$NodeMatcher.class
 com\mcsmanager\monitor\JsonUtil.class
+com\mcsmanager\monitor\InventorySnapshotAdapter.class
 com\mcsmanager\monitor\ActionResult.class
 com\mcsmanager\monitor\PlayerSnapshotReporter$1.class

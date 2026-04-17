@@ -52,6 +52,9 @@ final class ControlActionDispatcher {
         if ("mute".equalsIgnoreCase(action)) {
             return handleMute(request);
         }
+        if ("inventory".equalsIgnoreCase(action)) {
+            return handleInventory(request);
+        }
         return ActionResult.error(400, "Unsupported action: " + action);
     }
 
@@ -102,6 +105,14 @@ final class ControlActionDispatcher {
         );
     }
 
+    private ActionResult handleInventory(Map<String, Object> request) {
+        Player player = resolveOnlinePlayer(request);
+        if (player == null) {
+            return ActionResult.error(409, "Player must be online.");
+        }
+        return plugin.getInventorySnapshotAdapter().snapshot(player);
+    }
+
     private OfflinePlayer resolvePlayer(Map<String, Object> request, boolean allowOffline) {
         String uuidValue = readString(request, "playerUuid");
         if (!uuidValue.isEmpty()) {
@@ -133,6 +144,23 @@ final class ControlActionDispatcher {
             }
         }
         return null;
+    }
+
+    private Player resolveOnlinePlayer(Map<String, Object> request) {
+        String uuidValue = readString(request, "playerUuid");
+        if (!uuidValue.isEmpty()) {
+            try {
+                return Bukkit.getPlayer(UUID.fromString(uuidValue));
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+
+        String playerName = readString(request, "player");
+        if (playerName.isEmpty()) {
+            playerName = readString(request, "playerName");
+        }
+        return playerName.isEmpty() ? null : Bukkit.getPlayerExact(playerName);
     }
 
     private String readString(Map<String, Object> request, String key) {

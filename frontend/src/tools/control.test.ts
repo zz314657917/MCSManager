@@ -30,4 +30,37 @@ describe("control output normalization", () => {
       "[15:58:30] [Server thread/INFO]: ========================"
     ]);
   });
+
+  it("collapses blank lines introduced by stripped prompts and private mode control sequences", () => {
+    const rawOutput = [
+      "",
+      "> ",
+      "\u001b[?1l\u001b>\u001b[?1000l\u001b[?2004l\u001b[?1h\u001b=\u001b[?2004h> ",
+      "",
+      "\u001b[K[16:09:21] [Server thread/INFO]: \u001b[0;37;22m玩家在线 0/50\u001b[39;0m",
+      "",
+      "> ",
+      "",
+      "\u001b[K[16:09:22] [Server thread/INFO]: \u001b[0;37;22m========================\u001b[39;0m",
+      ""
+    ].join("\n");
+
+    expect(splitControlOutputLog(rawOutput)).toEqual([
+      "[16:09:21] [Server thread/INFO]: 玩家在线 0/50",
+      "[16:09:22] [Server thread/INFO]: ========================"
+    ]);
+  });
+
+  it("removes osc title sequences without leaving empty transcript rows", () => {
+    const rawOutput = [
+      "\u001b]0;MCSManager Terminal\u0007",
+      "\u001b[K[16:10:29] [Server thread/INFO]: \u001b[0;37;1mFor next page perform \u001b[0;35;22mcmi ? 2\u001b[39;0m",
+      "\u001b]0;idle\u0007",
+      "> "
+    ].join("\n");
+
+    expect(normalizeControlOutputLog(rawOutput)).toBe(
+      "[16:10:29] [Server thread/INFO]: For next page perform cmi ? 2"
+    );
+  });
 });

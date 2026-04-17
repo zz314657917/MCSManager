@@ -1,3 +1,5 @@
+import { t } from "@/lang/i18n";
+
 export type OperationsMobileNavIcon = "control" | "players" | "chat";
 
 export type OperationsMobileNavItem = {
@@ -10,19 +12,19 @@ export type OperationsMobileNavItem = {
 export const OPERATIONS_MOBILE_NAV_ITEMS: OperationsMobileNavItem[] = [
   {
     key: "control",
-    label: "Control",
+    label: t("TXT_CODE_CONTROL_TITLE"),
     path: "/control",
     icon: "control"
   },
   {
     key: "players",
-    label: "玩家",
+    label: t("TXT_CODE_GM_NAV_PLAYERS"),
     path: "/gm",
     icon: "players"
   },
   {
     key: "chat",
-    label: "聊天",
+    label: t("TXT_CODE_PLAYERS_CHAT"),
     path: "/gm/chat",
     icon: "chat"
   }

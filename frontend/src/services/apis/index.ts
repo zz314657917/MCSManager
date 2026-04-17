@@ -287,6 +287,20 @@ export const gmModerationApi = useDefineApi<
   method: "GET"
 });
 
+export const gmInventoryApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      playerUuid: string;
+    };
+  },
+  IMcsmGmPlayerInventorySnapshot
+>({
+  url: "/api/gm/:daemonId/:instanceId/players/:playerUuid/inventory",
+  method: "GET"
+});
+
 export const gmExecuteActionApi = useDefineApi<
   {
     data: IMcsmGmActionRequest;

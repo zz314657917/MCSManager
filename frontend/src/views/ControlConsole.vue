@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import ControlActionButtons from "@/components/control/ControlActionButtons.vue";
+import GmOperationsPanel from "@/components/gm/GmOperationsPanel.vue";
 import { OPERATIONS_MOBILE_NAV_ITEMS } from "@/components/operations/mobileNav";
 import ControlTargetSelector from "@/components/control/ControlTargetSelector.vue";
 import OperationsPageShell from "@/components/operations/OperationsPageShell.vue";
 import { useControlDashboard } from "@/hooks/useControlDashboard";
 import { useControlPanelState } from "@/hooks/useControlPanelState";
+import { useControlPlayerPanelPreviewState } from "@/hooks/useControlPlayerPanelPreviewState";
+import { useControlPlayerPanelState } from "@/hooks/useControlPlayerPanelState";
 import { useControlPreviewState } from "@/hooks/useControlPreviewState";
+import { useControlTargetFavorites } from "@/hooks/useControlTargetFavorites";
 import { useScreen } from "@/hooks/useScreen";
 import { t } from "@/lang/i18n";
 import { useAppStateStore } from "@/stores/useAppStateStore";
+import { useAppToolsStore } from "@/stores/useAppToolsStore";
 import { getControlTargetIdentity, getControlTargetStatusColor, getControlTargetStatusText } from "@/tools/controlStatus";
 import type { ControlLogLine, ControlTarget } from "@/types/control";
+import { Modal } from "ant-design-vue";
 import {
   CloudServerOutlined,
   DesktopOutlined,
@@ -25,11 +31,22 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 const { isPhone } = useScreen();
 const { state: appState } = useAppStateStore();
+const { openInputDialog } = useAppToolsStore();
 const logBodyRef = ref<HTMLDivElement>();
 const isMobileSelectorOpen = ref(false);
+const ALL_CONTROL_TARGETS_FILTER = "__all_control_targets__";
+const targetFilterDaemonId = ref(ALL_CONTROL_TARGETS_FILTER);
 
 const isLocalPreviewMode = appState.userInfo?.token === "local-preview-token";
 const controlState = isLocalPreviewMode ? useControlPreviewState() : useControlPanelState();
+const {
+  favoriteTargetKeys,
+  targetNotes,
+  toggleFavoriteTarget,
+  isFavoriteTarget,
+  getTargetNote,
+  setTargetNote
+} = useControlTargetFavorites();
 
 const {
   nodes,
@@ -43,7 +60,6 @@ const {
   currentTargets,
   isPollingPaused,
   isRefreshing,
-  selectNode,
   selectTarget,
   refreshCurrentTarget,
   togglePolling,
@@ -51,8 +67,12 @@ const {
   startCurrentTarget,
   stopCurrentTarget,
   restartCurrentTarget,
+  terminateCurrentTarget,
   sendCommand
 } = controlState;
+const controlPlayerState = isLocalPreviewMode
+  ? useControlPlayerPanelPreviewState(currentTarget)
+  : useControlPlayerPanelState(currentTarget);
 
 const {
   dashboardMeta,
@@ -62,6 +82,28 @@ const {
   isDashboardRefreshing,
   refreshDashboard
 } = useControlDashboard(currentTarget);
+const {
+  onlinePlayers,
+  currentServer: currentPlayerServer,
+  currentPlayer,
+  balances,
+  luckPerms,
+  moderation,
+  inventory,
+  auditRecords,
+  lastActionResult,
+  latestError: playerPanelError,
+  isPlayersLoading,
+  isDetailLoading,
+  isInventoryLoading,
+  isExecutingAction,
+  isPlayerModalOpen,
+  openPlayerModal,
+  closePlayerModal,
+  loadPlayers,
+  loadInventory,
+  executeAction: executePlayerAction
+} = controlPlayerState;
 
 const currentTargetModeText = computed(() =>
   currentTarget.value?.mode === "global" ? t("TXT_CODE_CONTROL_HOST_MODE") : t("TXT_CODE_4ccdd3a0")
@@ -99,10 +141,48 @@ const controlEyebrow = computed(() =>
 const mobileSelectorTitle = computed(() => `${t("TXT_CODE_20509fa0")} / ${t("TXT_CODE_d655beec")}`);
 const mobileSelectorNodeText = computed(() => currentNode.value?.daemonDisplayName || t("TXT_CODE_20509fa0"));
 const mobileSelectorTargetText = computed(
-  () => currentTarget.value?.displayName || t("TXT_CODE_CONTROL_TARGET")
+  () => getTargetNote(currentTarget.value) || currentTarget.value?.displayName || t("TXT_CODE_CONTROL_TARGET")
 );
 const mobileSelectorTargetId = computed(() => {
   return getControlTargetIdentity(currentTarget.value);
+});
+const currentTargetTitle = computed(
+  () => getTargetNote(currentTarget.value) || currentTarget.value?.displayName || "--"
+);
+const filteredTargetNodes = computed(() => {
+  if (targetFilterDaemonId.value === ALL_CONTROL_TARGETS_FILTER) {
+    return nodes.value;
+  }
+
+  return nodes.value.filter((node) => node.daemonId === targetFilterDaemonId.value);
+});
+
+const orderedCurrentTargets = computed(() => {
+  const favoriteTargets: ControlTarget[] = [];
+  const groupedTargets: ControlTarget[] = [];
+
+  for (const node of filteredTargetNodes.value) {
+    const nodeGlobals: ControlTarget[] = [];
+    const nodeInstances: ControlTarget[] = [];
+
+    for (const target of node.targets) {
+      if (target.mode === "instance" && isFavoriteTarget(target)) {
+        favoriteTargets.push(target);
+        continue;
+      }
+
+      if (target.mode === "global") {
+        nodeGlobals.push(target);
+        continue;
+      }
+
+      nodeInstances.push(target);
+    }
+
+    groupedTargets.push(...nodeGlobals, ...nodeInstances);
+  }
+
+  return [...favoriteTargets, ...groupedTargets];
 });
 
 const getLogClass = (line: ControlLogLine) => `terminal-line--${line.level}`;
@@ -110,6 +190,7 @@ const getLogClass = (line: ControlLogLine) => `terminal-line--${line.level}`;
 const handleRefresh = () => {
   refreshCurrentTarget();
   void refreshDashboard(true);
+  void loadPlayers(true);
 };
 
 const openMobileSelector = () => {
@@ -120,10 +201,6 @@ const closeMobileSelector = () => {
   isMobileSelectorOpen.value = false;
 };
 
-const handleSelectNode = (daemonId: string) => {
-  selectNode(daemonId);
-};
-
 const handleSelectTarget = (target: ControlTarget) => {
   selectTarget(target);
   if (isPhone.value) {
@@ -131,8 +208,59 @@ const handleSelectTarget = (target: ControlTarget) => {
   }
 };
 
+const handleToggleFavoriteTarget = (target: ControlTarget) => {
+  toggleFavoriteTarget(target);
+};
+
+const handleChangeTargetFilter = (daemonId: string) => {
+  targetFilterDaemonId.value = daemonId;
+
+  if (daemonId === ALL_CONTROL_TARGETS_FILTER) return;
+  if (currentTarget.value?.daemonId === daemonId) return;
+
+  const nextTarget = nodes.value.find((node) => node.daemonId === daemonId)?.targets[0];
+  if (nextTarget) {
+    selectTarget(nextTarget);
+  }
+};
+
+const handleEditTargetNote = async (target: ControlTarget) => {
+  if (target.mode !== "instance") return;
+
+  const currentNote = getTargetNote(target);
+  const dialogTitle = currentNote
+    ? `${t("TXT_CODE_CONTROL_EDIT_TARGET_NOTE")} (${currentNote})`
+    : `${t("TXT_CODE_CONTROL_EDIT_TARGET_NOTE")} (${target.displayName})`;
+
+  try {
+    const nextNote = String((await openInputDialog(dialogTitle)) || "");
+    setTargetNote(target, nextNote);
+  } catch {
+    // ignore canceled input dialog
+  }
+};
+
 const openPlayersPage = () => {
   router.push("/gm");
+};
+
+const currentOnlinePlayerCountText = computed(() => `${onlinePlayers.value.length}`);
+
+const handleTerminateCurrentTarget = () => {
+  if (currentTarget.value?.mode !== "instance") return;
+
+  Modal.confirm({
+    title: t("TXT_CODE_893567ac"),
+    content: t("TXT_CODE_ec08484"),
+    okText: t("TXT_CODE_7b67813a"),
+    cancelText: t("TXT_CODE_5366af54"),
+    okButtonProps: {
+      danger: true
+    },
+    async onOk() {
+      await terminateCurrentTarget();
+    }
+  });
 };
 
 watch(
@@ -155,10 +283,20 @@ watch(
     }
   }
 );
+
+watch(
+  nodes,
+  (nextNodes) => {
+    if (targetFilterDaemonId.value === ALL_CONTROL_TARGETS_FILTER) return;
+    if (nextNodes.some((node) => node.daemonId === targetFilterDaemonId.value)) return;
+    targetFilterDaemonId.value = ALL_CONTROL_TARGETS_FILTER;
+  },
+  { deep: true }
+);
 </script>
 
 <template>
-  <div class="control-console">
+  <div class="control-console" data-testid="control-console">
     <OperationsPageShell
       :title="t('TXT_CODE_CONTROL_TITLE')"
       :eyebrow="controlEyebrow"
@@ -183,7 +321,7 @@ watch(
           </div>
           <div class="control-console__header-pill control-console__header-pill--accent">
             <DesktopOutlined />
-            <span>{{ currentTarget.displayName }}</span>
+            <span>{{ currentTargetTitle }}</span>
           </div>
           <a-tag class="control-console__mode-tag" :bordered="false">
             {{ currentTargetModeText }}
@@ -200,7 +338,12 @@ watch(
 
       <template #mobile-prelude>
         <section v-if="isPhone && currentTarget" class="control-console__mobile-switcher">
-          <button type="button" class="control-console__mobile-switcher-card" @click="openMobileSelector">
+          <button
+            type="button"
+            class="control-console__mobile-switcher-card"
+            data-testid="control-mobile-switcher"
+            @click="openMobileSelector"
+          >
             <div class="control-console__mobile-switcher-main">
               <div class="control-console__mobile-switcher-copy">
                 <div class="control-console__mobile-switcher-eyebrow">{{ mobileSelectorTitle }}</div>
@@ -232,10 +375,16 @@ watch(
         <ControlTargetSelector
           :nodes="nodes"
           :current-node-id="currentNode?.daemonId"
-          :current-targets="currentTargets"
+          :current-targets="orderedCurrentTargets"
           :current-target-key="currentTargetKey"
-          @select-node="handleSelectNode"
+          :favorite-target-keys="favoriteTargetKeys"
+          :target-notes="targetNotes"
+          :target-filter-daemon-id="targetFilterDaemonId"
+          :all-targets-filter-value="ALL_CONTROL_TARGETS_FILTER"
           @select-target="handleSelectTarget"
+          @toggle-favorite="handleToggleFavoriteTarget"
+          @change-target-filter="handleChangeTargetFilter"
+          @edit-target-note="handleEditTargetNote"
         />
       </template>
 
@@ -247,6 +396,7 @@ watch(
         <section
           class="control-panel control-panel--summary control-panel--summary-orderable"
           :class="{ 'control-panel--summary-mobile': isPhone }"
+          data-testid="control-summary-panel"
         >
           <div class="control-panel__header">
             <span>{{ t("TXT_CODE_CONTROL_SUMMARY") }}</span>
@@ -265,7 +415,9 @@ watch(
           >
             <div class="control-console__summary-copy">
               <div v-if="!isPhone" class="control-console__summary-kicker">{{ currentTargetContext }}</div>
-              <div class="control-console__summary-title">{{ currentTarget.displayName }}</div>
+              <div class="control-console__summary-title" data-testid="control-summary-title">
+                {{ currentTargetTitle }}
+              </div>
               <p v-if="currentTargetDescription && !isPhone" class="control-console__summary-desc">
                 {{ currentTargetDescription }}
               </p>
@@ -287,13 +439,17 @@ watch(
           </div>
           <div
             class="control-console__metrics-grid"
-            :class="{ 'control-console__metrics-grid--mobile': isPhone }"
+            :class="[
+              `control-console__metrics-grid--${currentTarget.mode}`,
+              { 'control-console__metrics-grid--mobile': isPhone }
+            ]"
           >
             <article
               v-for="metric in dashboardMetrics"
               :key="metric.key"
               class="control-console__metric-card"
               :class="[
+                `control-console__metric-card--${metric.key}`,
                 `is-${metric.tone}`,
                 { 'control-console__metric-card--segmented': !!metric.segments?.length }
               ]"
@@ -315,11 +471,41 @@ watch(
               <span class="control-console__metric-detail">{{ metric.detail }}</span>
             </article>
           </div>
+
+          <section
+            v-if="currentTarget.mode === 'instance'"
+            class="control-console__players-section"
+            data-testid="control-online-players"
+          >
+            <div class="control-console__players-header">
+              <span>{{ t("TXT_CODE_PLAYERS_ONLINE") }}</span>
+              <a-tag>{{ currentOnlinePlayerCountText }}</a-tag>
+            </div>
+            <a-spin :spinning="isPlayersLoading">
+              <div v-if="onlinePlayers.length" class="control-console__players-list">
+                <button
+                  v-for="player in onlinePlayers"
+                  :key="player.playerUuid"
+                  type="button"
+                  class="control-console__player-chip"
+                  :data-testid="`control-online-player-${player.playerUuid}`"
+                  @click="openPlayerModal(player)"
+                >
+                  <span class="control-console__player-name">{{ player.playerName }}</span>
+                  <span class="control-console__player-meta">
+                    {{ player.instanceDisplayName }}
+                  </span>
+                </button>
+              </div>
+              <a-empty v-else :image="false" :description="t('TXT_CODE_CONTROL_NO_ONLINE_PLAYERS')" />
+            </a-spin>
+          </section>
         </section>
 
         <section
           class="control-panel control-panel--terminal control-panel--terminal-orderable"
           :class="{ 'control-panel--terminal-mobile': isPhone }"
+          data-testid="control-terminal-panel"
         >
           <div class="control-console__terminal-toolbar">
             <div class="control-console__terminal-heading">
@@ -343,6 +529,7 @@ watch(
             ref="logBodyRef"
             class="control-console__terminal-body"
             :class="{ 'control-console__terminal-body--mobile': isPhone }"
+            data-testid="control-terminal-body"
           >
             <template v-if="currentLogs.length > 0">
               <div
@@ -358,14 +545,20 @@ watch(
             <a-empty v-else class="control-console__terminal-empty" :description="t('TXT_CODE_5415f009')" />
           </div>
 
-          <div class="control-console__terminal-input">
+          <div class="control-console__terminal-input" data-testid="control-terminal-input-row">
             <a-input
               v-model:value="commandInput"
               :disabled="!currentTarget.daemonAvailable"
               :placeholder="commandPlaceholder"
+              data-testid="control-command-input"
               @press-enter="sendCommand"
             />
-            <a-button type="primary" :disabled="!commandInput.trim()" @click="sendCommand">
+            <a-button
+              type="primary"
+              :disabled="!commandInput.trim()"
+              data-testid="control-command-send"
+              @click="sendCommand"
+            >
               <template #icon>
                 <SendOutlined />
               </template>
@@ -390,6 +583,7 @@ watch(
         <div
           class="control-console__actions-slot"
           :class="{ 'control-console__actions-slot--mobile': isPhone }"
+          data-testid="control-actions-slot"
         >
           <ControlActionButtons
             :target="currentTarget"
@@ -399,6 +593,7 @@ watch(
             @start="startCurrentTarget"
             @stop="stopCurrentTarget"
             @restart="restartCurrentTarget"
+            @terminate="handleTerminateCurrentTarget"
           />
         </div>
       </div>
@@ -414,18 +609,62 @@ watch(
       :height="'78vh'"
       :open="isMobileSelectorOpen"
       :title="mobileSelectorTitle"
+      data-testid="control-mobile-drawer"
       @close="closeMobileSelector"
     >
       <ControlTargetSelector
         drawer
         :nodes="nodes"
         :current-node-id="currentNode?.daemonId"
-        :current-targets="currentTargets"
+        :current-targets="orderedCurrentTargets"
         :current-target-key="currentTargetKey"
-        @select-node="handleSelectNode"
+        :favorite-target-keys="favoriteTargetKeys"
+        :target-notes="targetNotes"
+        :target-filter-daemon-id="targetFilterDaemonId"
+        :all-targets-filter-value="ALL_CONTROL_TARGETS_FILTER"
         @select-target="handleSelectTarget"
+        @toggle-favorite="handleToggleFavoriteTarget"
+        @change-target-filter="handleChangeTargetFilter"
+        @edit-target-note="handleEditTargetNote"
       />
     </a-drawer>
+
+    <a-modal
+      v-model:open="isPlayerModalOpen"
+      :title="currentPlayer ? `${currentPlayer.playerName} / GM 管理` : 'GM 管理'"
+      :footer="null"
+      :width="isPhone ? 'calc(100vw - 16px)' : 960"
+      destroy-on-close
+      centered
+      :body-style="{ maxHeight: isPhone ? '78svh' : '80vh', overflowY: 'auto', padding: isPhone ? '12px' : '20px' }"
+      @cancel="closePlayerModal"
+    >
+      <div data-testid="control-player-modal">
+        <a-alert
+          v-if="playerPanelError"
+          class="control-console__player-modal-alert"
+          type="error"
+          show-icon
+          :message="playerPanelError"
+        />
+
+        <GmOperationsPanel
+          :player="currentPlayer"
+          :server="currentPlayerServer"
+          :balances="balances"
+          :luck-perms="luckPerms"
+          :moderation="moderation"
+          :inventory="inventory"
+          :audit-records="auditRecords"
+          :last-action-result="lastActionResult"
+          :show-inventory="true"
+          :inventory-loading="isInventoryLoading"
+          :busy="isExecutingAction || isDetailLoading"
+          :on-execute="executePlayerAction"
+          :on-refresh-inventory="() => loadInventory(true)"
+        />
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -554,6 +793,39 @@ watch(
   overflow: visible;
 }
 
+@media (min-width: 993px) {
+  .control-console__workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(420px, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "terminal summary"
+      "actions summary";
+    align-items: stretch;
+  }
+
+  .control-panel--summary-orderable {
+    grid-area: summary;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .control-panel--terminal-orderable {
+    grid-area: terminal;
+  }
+
+  .control-console__actions-slot {
+    grid-area: actions;
+  }
+
+  .control-console__summary-meta {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 .control-panel {
   min-height: 0;
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -615,6 +887,8 @@ watch(
 .control-console__summary-desc {
   margin: 10px 0 0;
   color: var(--color-gray-8);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .control-console__summary-meta {
@@ -646,6 +920,95 @@ watch(
   display: block;
   margin-top: 6px;
   word-break: break-all;
+}
+
+@media (min-width: 993px) {
+  .control-console__summary-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-console__summary-copy {
+    width: 100%;
+  }
+
+  .control-console__summary-title {
+    font-size: 28px;
+  }
+
+  .control-console__summary-desc {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+  }
+
+  .control-console__summary-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--instance {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--global {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .control-console__metric-card {
+    min-height: 112px;
+    padding: 14px;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--instance .control-console__metric-card--segmented {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--global .control-console__metric-card {
+    min-height: 124px;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--global .control-console__metric-value {
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--global .control-console__metric-detail {
+    font-size: 12px;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--instance .control-console__metric-card--players {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .control-console__metric-value {
+    font-size: 24px;
+    line-height: 1.08;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--instance .control-console__metric-card--memory .control-console__metric-value {
+    font-size: 20px;
+    line-height: 1.06;
+  }
+
+  .control-console__metrics-grid.control-console__metrics-grid--instance .control-console__metric-card--players .control-console__metric-value {
+    font-size: 26px;
+  }
+
+  .control-console__metric-detail {
+    white-space: normal;
+    line-height: 1.4;
+  }
+
+  .control-console__metric-segments {
+    gap: 8px;
+  }
+
+  .control-console__metric-segment {
+    padding: 8px 10px;
+  }
 }
 
 .control-console__metrics-grid {
@@ -770,6 +1133,67 @@ watch(
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.control-console__players-section {
+  margin-top: 14px;
+  padding: 0 18px;
+}
+
+.control-console__players-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.control-console__players-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.control-console__player-chip {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.92);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.control-console__player-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59, 130, 246, 0.26);
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+}
+
+.control-console__player-name,
+.control-console__player-meta {
+  display: block;
+}
+
+.control-console__player-name {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.control-console__player-meta {
+  margin-top: 4px;
+  color: var(--color-gray-7);
+  font-size: 12px;
+}
+
+.control-console__player-modal-alert {
+  margin-bottom: 14px;
 }
 
 .control-panel--terminal {
@@ -912,6 +1336,11 @@ watch(
     padding-left: 14px;
   }
 
+  .control-console__players-section {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
   .control-console__summary-meta {
     min-width: 0;
     width: 100%;
@@ -1012,5 +1441,9 @@ watch(
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+}
+
+.control-console__metrics-grid--mobile + .control-console__players-section {
+  margin-top: 12px;
 }
 </style>

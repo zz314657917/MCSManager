@@ -67,6 +67,26 @@ const eraseTerminalLine = (line: string[], cursorColumn: number, parameter: stri
 
 const TRANSIENT_TERMINAL_PROMPT_LINE = /^\s*(?:>|\$|#)\s*$/;
 
+const sanitizeRenderedTerminalLines = (lines: string[]) => {
+  const sanitized: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\s+$/g, "");
+
+    if (TRANSIENT_TERMINAL_PROMPT_LINE.test(line)) {
+      continue;
+    }
+
+    if (line.trim() === "") {
+      continue;
+    }
+
+    sanitized.push(line);
+  }
+
+  return sanitized;
+};
+
 // Convert raw outputlog snapshots into a readable terminal transcript.
 const renderTerminalSnapshot = (raw?: string | null) => {
   const source = String(raw ?? "").replace(/\r\n/g, "\n");
@@ -190,10 +210,7 @@ const renderTerminalSnapshot = (raw?: string | null) => {
     column += 1;
   }
 
-  return lines
-    .map((line) => line.join("").replace(/\s+$/g, ""))
-    .filter((line) => !TRANSIENT_TERMINAL_PROMPT_LINE.test(line))
-    .join("\n");
+  return sanitizeRenderedTerminalLines(lines.map((line) => line.join(""))).join("\n");
 };
 
 export const normalizeControlOutputLog = (raw?: string | null) => renderTerminalSnapshot(raw);

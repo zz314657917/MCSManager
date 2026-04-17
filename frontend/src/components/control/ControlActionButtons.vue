@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { t } from "@/lang/i18n";
 import type { ControlTarget } from "@/types/control";
-import { PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons-vue";
+import { CloseOutlined, PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons-vue";
 
 withDefaults(
   defineProps<{
@@ -19,6 +19,7 @@ const emit = defineEmits<{
   start: [];
   stop: [];
   restart: [];
+  terminate: [];
 }>();
 </script>
 
@@ -26,12 +27,17 @@ const emit = defineEmits<{
   <div
     v-if="mobile"
     class="control-action-buttons__mobile-dock"
-    :class="{ 'control-action-buttons__mobile-dock--global': target.mode === 'global' }"
+    :class="{
+      'control-action-buttons__mobile-dock--global': target.mode === 'global',
+      'control-action-buttons__mobile-dock--instance': target.mode === 'instance'
+    }"
+    data-testid="control-actions-mobile"
   >
     <a-button
       class="control-action-buttons__mobile-button"
       type="primary"
       :disabled="!target.daemonAvailable"
+      data-testid="control-action-start"
       @click="emit('start')"
     >
       <template #icon>
@@ -44,6 +50,7 @@ const emit = defineEmits<{
       danger
       ghost
       :disabled="!target.daemonAvailable"
+      data-testid="control-action-stop"
       @click="emit('stop')"
     >
       <template #icon>
@@ -55,6 +62,7 @@ const emit = defineEmits<{
       v-if="target.mode === 'instance'"
       class="control-action-buttons__mobile-button"
       :disabled="!target.daemonAvailable"
+      data-testid="control-action-restart"
       @click="emit('restart')"
     >
       <template #icon>
@@ -62,9 +70,22 @@ const emit = defineEmits<{
       </template>
       {{ t("TXT_CODE_77cc12da") }}
     </a-button>
+    <a-button
+      v-if="target.mode === 'instance'"
+      class="control-action-buttons__mobile-button"
+      danger
+      :disabled="!target.daemonAvailable || target.status === 0"
+      data-testid="control-action-terminate"
+      @click="emit('terminate')"
+    >
+      <template #icon>
+        <CloseOutlined />
+      </template>
+      {{ t("TXT_CODE_1c36c8f2") }}
+    </a-button>
   </div>
 
-  <section v-else class="control-panel control-panel--actions">
+  <section v-else class="control-panel control-panel--actions" data-testid="control-actions-desktop">
     <div class="control-panel__header">
       <span>{{ t("TXT_CODE_OPERATE") }}</span>
       <a-tag :bordered="false">{{ modeText }}</a-tag>
@@ -74,6 +95,7 @@ const emit = defineEmits<{
         class="control-action-buttons__button"
         type="primary"
         :disabled="!target.daemonAvailable"
+        data-testid="control-action-start"
         @click="emit('start')"
       >
         <template #icon>
@@ -86,6 +108,7 @@ const emit = defineEmits<{
         danger
         ghost
         :disabled="!target.daemonAvailable"
+        data-testid="control-action-stop"
         @click="emit('stop')"
       >
         <template #icon>
@@ -97,12 +120,26 @@ const emit = defineEmits<{
         v-if="target.mode === 'instance'"
         class="control-action-buttons__button"
         :disabled="!target.daemonAvailable"
+        data-testid="control-action-restart"
         @click="emit('restart')"
       >
         <template #icon>
           <ReloadOutlined />
         </template>
         {{ t("TXT_CODE_77cc12da") }}
+      </a-button>
+      <a-button
+        v-if="target.mode === 'instance'"
+        class="control-action-buttons__button"
+        danger
+        :disabled="!target.daemonAvailable || target.status === 0"
+        data-testid="control-action-terminate"
+        @click="emit('terminate')"
+      >
+        <template #icon>
+          <CloseOutlined />
+        </template>
+        {{ t("TXT_CODE_1c36c8f2") }}
       </a-button>
     </div>
   </section>
@@ -155,6 +192,10 @@ const emit = defineEmits<{
 
 .control-action-buttons__mobile-dock--global {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.control-action-buttons__mobile-dock--instance {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .control-action-buttons__mobile-button {

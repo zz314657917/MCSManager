@@ -6,6 +6,7 @@ import {
   CloseOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  DesktopOutlined,
   DownOutlined,
   FormOutlined,
   FrownOutlined,
@@ -363,6 +364,12 @@ const toMarketPage = () => {
   });
 };
 
+const toControlPage = () => {
+  router.push({
+    path: "/control"
+  });
+};
+
 const toNodesPage = () => {
   router.push({
     path: "/node"
@@ -604,6 +611,10 @@ onMounted(async () => {
                 <DownOutlined />
               </a-button>
             </a-dropdown>
+            <a-button class="mr-10" @click="toControlPage">
+              <DesktopOutlined />
+              {{ t("TXT_CODE_CONTROL_TITLE") }}
+            </a-button>
             <a-button
               type="primary"
               :disabled="!currentRemoteNode?.available"

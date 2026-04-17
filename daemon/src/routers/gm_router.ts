@@ -67,6 +67,17 @@ routerApp.on("gm/moderation", async (ctx, data) => {
   }
 });
 
+routerApp.on("gm/inventory", async (ctx, data) => {
+  try {
+    protocol.response(
+      ctx,
+      await gmService.getInventory(String(data.instanceId || ""), String(data.playerUuid || ""))
+    );
+  } catch (error: any) {
+    protocol.responseError(ctx, error);
+  }
+});
+
 routerApp.on("gm/actions/execute", async (ctx, data) => {
   try {
     protocol.response(ctx, await gmService.executeAction(data as IMcsmGmActionRequest));

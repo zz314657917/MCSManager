@@ -384,6 +384,36 @@ declare global {
     updatedAt?: string;
   }
 
+  interface IMcsmGmInventoryEnchant {
+    key: string;
+    level: number;
+  }
+
+  interface IMcsmGmInventorySlot {
+    section: "hotbar" | "main" | "armor" | "offhand";
+    slot: number;
+    empty: boolean;
+    material?: string;
+    rawTypeName?: string;
+    amount?: number;
+    durability?: number;
+    maxDurability?: number;
+    displayName?: string;
+    lore?: string[];
+    enchants?: IMcsmGmInventoryEnchant[];
+    itemFlags?: string[];
+  }
+
+  interface IMcsmGmPlayerInventorySnapshot {
+    available: boolean;
+    playerUuid: string;
+    playerName: string;
+    online: boolean;
+    source: "bukkit";
+    updatedAt: string;
+    slots: IMcsmGmInventorySlot[];
+  }
+
   interface IMcsmLuckPermsGroupGrant {
     name: string;
     temporary: boolean;

@@ -89,10 +89,16 @@ const selectPlayer = (player: IMcsmGmPlayerPresence) => {
     serverKey: getPlayerServerKey(player)
   });
 };
+
+const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 </script>
 
 <template>
-  <div class="gm-sidebar" :class="{ 'gm-sidebar--mobile': mobileMode }">
+  <div
+    class="gm-sidebar"
+    :class="{ 'gm-sidebar--mobile': mobileMode }"
+    :data-testid="mobileMode ? 'gm-sidebar-mobile' : 'gm-sidebar'"
+  >
     <template v-if="mobileMode">
       <section class="gm-sidebar__section gm-sidebar__section--players">
         <div class="gm-sidebar__section-header">
@@ -128,6 +134,9 @@ const selectPlayer = (player: IMcsmGmPlayerPresence) => {
                 type="button"
                 class="gm-sidebar__player-card"
                 :class="{ 'is-active': isPlayerActive(player.playerUuid) }"
+                :data-testid="
+                  `gm-player-card-${normalizeTestKey(getPlayerServerKey(player))}-${normalizeTestKey(player.playerUuid)}`
+                "
                 @click="selectPlayer(player)"
               >
                 <div class="gm-sidebar__player-line">
@@ -157,6 +166,7 @@ const selectPlayer = (player: IMcsmGmPlayerPresence) => {
             type="button"
             class="gm-sidebar__server-card gm-sidebar__server-card--compact"
             :class="{ 'is-active': isServerActive(server) }"
+            :data-testid="`gm-server-card-${normalizeTestKey(getGmServerKey(server))}`"
             @click="emit('select-server', getGmServerKey(server))"
           >
             <strong>{{ server.instanceDisplayName }}</strong>
@@ -201,6 +211,9 @@ const selectPlayer = (player: IMcsmGmPlayerPresence) => {
                 type="button"
                 class="gm-sidebar__player-card"
                 :class="{ 'is-active': isPlayerActive(player.playerUuid) }"
+                :data-testid="
+                  `gm-player-card-${normalizeTestKey(getPlayerServerKey(player))}-${normalizeTestKey(player.playerUuid)}`
+                "
                 @click="selectPlayer(player)"
               >
                 <div class="gm-sidebar__player-line">

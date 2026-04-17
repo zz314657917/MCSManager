@@ -24,6 +24,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
     private VaultEconomyAdapter vaultEconomyAdapter;
     private PlayerPointsAdapter playerPointsAdapter;
     private LuckPermsAdapter luckPermsAdapter;
+    private InventorySnapshotAdapter inventorySnapshotAdapter;
     private ControlActionDispatcher controlActionDispatcher;
 
     @Override
@@ -97,6 +98,10 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         return luckPermsAdapter;
     }
 
+    InventorySnapshotAdapter getInventorySnapshotAdapter() {
+        return inventorySnapshotAdapter;
+    }
+
     LocalControlSettings getLocalControlSettings() {
         return LocalControlSettings.fromConfig(getConfig());
     }
@@ -153,6 +158,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         actions.put("points", Boolean.valueOf(playerPointsAdapter != null && playerPointsAdapter.isAvailable()));
         actions.put("luckPerms", Boolean.valueOf(luckPermsAdapter != null && luckPermsAdapter.isAvailable()));
         actions.put("mute", Boolean.TRUE);
+        actions.put("inventory", Boolean.TRUE);
         metadata.put("actions", actions);
         return metadata;
     }
@@ -163,6 +169,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         vaultEconomyAdapter = new VaultEconomyAdapter();
         playerPointsAdapter = new PlayerPointsAdapter();
         luckPermsAdapter = new LuckPermsAdapter();
+        inventorySnapshotAdapter = new InventorySnapshotAdapter();
         controlActionDispatcher = new ControlActionDispatcher(this);
         startMainThreadProbe();
         startHeartbeatReporter();

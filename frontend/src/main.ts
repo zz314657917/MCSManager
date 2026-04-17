@@ -18,7 +18,7 @@ const getHashPath = () => {
   return rawHash.split("?")[0] || "/";
 };
 
-const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/players"]);
+const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/gm/chat", "/players"]);
 
 const isStandalonePreviewEntry = () => STANDALONE_PREVIEW_PATHS.has(getHashPath());
 

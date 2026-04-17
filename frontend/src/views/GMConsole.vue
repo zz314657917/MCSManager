@@ -149,7 +149,11 @@ watch(
 </script>
 
 <template>
-  <div class="gm-console-page">
+  <div
+    class="gm-console-page"
+    data-testid="gm-console"
+    :data-page-mode="isChatPage ? 'chat' : 'manage'"
+  >
     <OperationsPageShell
       :title="pageTitle"
       :eyebrow="pageEyebrow"
@@ -208,6 +212,7 @@ watch(
           type="error"
           show-icon
           :message="latestError"
+          data-testid="gm-error-alert"
         />
 
         <section v-if="currentServer && !isPhone" class="gm-console__summary-card">
@@ -271,7 +276,7 @@ watch(
             />
           </section>
 
-          <section class="gm-console__chat-panel">
+          <section class="gm-console__chat-panel" data-testid="gm-chat-panel">
             <div class="gm-console__chat-toolbar">
               <div class="gm-console__chat-toolbar-copy">
                 <div class="gm-console__chat-title">全服聊天时间线</div>
@@ -285,13 +290,14 @@ watch(
             </div>
 
             <a-spin :spinning="isChatLoading">
-              <div ref="chatBodyRef" class="gm-console__chat-body">
+              <div ref="chatBodyRef" class="gm-console__chat-body" data-testid="gm-chat-body">
                 <template v-if="messages.length">
                   <article
                     v-for="message in messages"
                     :key="getMessageKey(message)"
                     class="gm-console__message"
                     :class="getMessageClass(message)"
+                    data-testid="gm-chat-message"
                   >
                     <div class="gm-console__message-meta">
                       <span class="gm-console__message-author">
@@ -311,7 +317,11 @@ watch(
           </section>
         </div>
 
-        <section v-if="isPhone && !isChatPage" class="gm-console__mobile-player-panel">
+        <section
+          v-if="isPhone && !isChatPage"
+          class="gm-console__mobile-player-panel"
+          data-testid="gm-mobile-player-panel"
+        >
           <GmServerPlayerSidebar
             :nodes="nodes"
             :servers="servers"

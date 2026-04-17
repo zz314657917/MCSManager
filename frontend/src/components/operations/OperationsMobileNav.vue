@@ -32,13 +32,18 @@ const navigateTo = (item: OperationsMobileNavItem) => {
 </script>
 
 <template>
-  <nav class="operations-mobile-nav" aria-label="Operations navigation">
+  <nav
+    class="operations-mobile-nav"
+    aria-label="Operations navigation"
+    data-testid="operations-mobile-nav"
+  >
     <button
       v-for="item in items"
       :key="item.key"
       type="button"
       class="operations-mobile-nav__item"
       :class="{ 'is-active': isActive(item) }"
+      :data-testid="`mobile-nav-item-${item.key}`"
       @click="navigateTo(item)"
     >
       <component :is="iconMap[item.icon]" class="operations-mobile-nav__icon" />

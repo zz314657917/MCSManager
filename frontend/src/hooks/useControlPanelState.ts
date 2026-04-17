@@ -1,10 +1,12 @@
 import { GLOBAL_INSTANCE_NAME, GLOBAL_INSTANCE_UUID } from "@/config/const";
+import { useDocumentVisibility } from "@/hooks/useDocumentVisibility";
 import { TYPE_MINECRAFT_JAVA, verifyEULA } from "@/hooks/useInstance";
 import { t } from "@/lang/i18n";
 import { remoteInstances, remoteNodeList } from "@/services/apis";
 import {
   getInstanceInfo,
   getInstanceOutputLog,
+  killInstance,
   openInstance,
   restartInstance,
   sendInstanceCommand,
@@ -91,6 +93,7 @@ const buildOutputLogLines = (rawOutput: string) => {
 };
 
 export function useControlPanelState() {
+  const { isDocumentVisible } = useDocumentVisibility();
   const nodes = ref<ControlPreviewNode[]>([]);
   const logsByTarget = ref<Record<string, ControlLogLine[]>>({});
   const rawOutputByTarget = ref<Record<string, string>>({});
@@ -552,6 +555,7 @@ export function useControlPanelState() {
     clearPollTimer();
     const target = currentTarget.value;
     if (!target || isPollingPaused.value) return;
+    if (!isDocumentVisible.value) return;
     if (!target.daemonAvailable) return;
     if (target.mode === "global" && target.status !== INSTANCE_STATUS_CODE.RUNNING) return;
 
@@ -849,6 +853,51 @@ export function useControlPanelState() {
     }
   };
 
+  const terminateCurrentTarget = async () => {
+    const target = currentTarget.value;
+    const targetKey = currentTargetKey.value;
+    if (!target || !targetKey || target.mode !== "instance") return;
+
+    if (!target.daemonAvailable) {
+      const text = t("TXT_CODE_CONTROL_NODE_OFFLINE_ACTION");
+      appendLog(target, "error", text);
+      reportErrorMsg(new Error(text));
+      return;
+    }
+
+    if (target.status === INSTANCE_STATUS_CODE.STOPPED) {
+      appendLog(target, "warn", t("TXT_CODE_CONTROL_INSTANCE_ALREADY_STOPPED"));
+      return;
+    }
+
+    updateTargetStatus(targetKey, INSTANCE_STATUS_CODE.BUSY);
+    appendLog(target, "warn", `[instance] terminate ${target.displayName}`);
+
+    try {
+      await killInstance().execute({
+        params: {
+          daemonId: target.daemonId,
+          uuid: target.instanceId
+        }
+      });
+      appendLog(target, "info", `[instance] ${target.displayName} terminate request sent.`);
+      await loadTargetsForDaemon(target.daemonId, {
+        forceRequest: true,
+        showToastOnError: false
+      });
+    } catch (error) {
+      await loadTargetsForDaemon(target.daemonId, {
+        forceRequest: true,
+        showToastOnError: false
+      });
+      reportControlError(error, {
+        fallbackText: t("TXT_CODE_CONTROL_SERVER_ERROR"),
+        target,
+        showToast: true
+      });
+    }
+  };
+
   const sendCommand = async () => {
     const target = currentTarget.value;
     const command = commandInput.value.trim();
@@ -917,6 +966,40 @@ export function useControlPanelState() {
     });
   });
 
+  watch(isDocumentVisible, (visible) => {
+    if (!visible) {
+      clearPollTimer();
+      return;
+    }
+
+    const target = currentTarget.value;
+    const daemonId = currentNode.value?.daemonId;
+
+    if (!target || isPollingPaused.value) {
+      startPoller();
+      return;
+    }
+
+    if (target.mode === "global" && target.status !== INSTANCE_STATUS_CODE.RUNNING) {
+      void (async () => {
+        if (!daemonId) return;
+        const nodeLoaded = await loadNodes(true, false);
+        if (!nodeLoaded) return;
+        await loadTargetsForDaemon(daemonId, {
+          forceRequest: true,
+          showToastOnError: true
+        });
+      })().finally(() => {
+        startPoller();
+      });
+      return;
+    }
+
+    void refreshCurrentTarget().finally(() => {
+      startPoller();
+    });
+  });
+
   onUnmounted(() => {
     clearPollTimer();
     targetLoaders.clear();
@@ -942,6 +1025,7 @@ export function useControlPanelState() {
     startCurrentTarget,
     stopCurrentTarget,
     restartCurrentTarget,
+    terminateCurrentTarget,
     sendCommand
   };
 }

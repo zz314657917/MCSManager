@@ -411,14 +411,33 @@ export function useControlPreviewState() {
     }, 900);
   };
 
+  const terminateCurrentTarget = () => {
+    const target = currentTarget.value;
+    const targetKey = currentTargetKey.value;
+    if (!target || !targetKey || target.mode !== "instance") return;
+    if (!target.daemonAvailable) {
+      appendLog(target, "error", "节点离线，无法执行终止操作。");
+      return;
+    }
+
+    if (target.status === INSTANCE_STATUS_CODE.STOPPED) {
+      appendLog(target, "warn", "实例已经停止。");
+      return;
+    }
+
+    updateTargetStatus(targetKey, INSTANCE_STATUS_CODE.BUSY);
+    appendLogByKey(targetKey, "warn", `[instance] terminate ${target.displayName}`);
+    scheduleTask(() => {
+      updateTargetStatus(targetKey, INSTANCE_STATUS_CODE.STOPPED);
+      appendLogByKey(targetKey, "info", `[instance] ${target.displayName} terminated.`);
+    }, 240);
+  };
+
   const sendCommand = () => {
     const target = currentTarget.value;
     const targetKey = currentTargetKey.value;
     const command = commandInput.value.trim();
     if (!target || !targetKey || !command) return;
-
-    commandInput.value = "";
-    appendLogByKey(targetKey, "command", `$ ${command}`);
 
     if (!target.daemonAvailable) {
       appendLogByKey(targetKey, "error", "节点离线，命令发送失败。");
@@ -430,6 +449,8 @@ export function useControlPreviewState() {
         appendLogByKey(targetKey, "error", "宿主机终端尚未打开，请先执行打开操作。");
         return;
       }
+      commandInput.value = "";
+      appendLogByKey(targetKey, "command", `$ ${command}`);
       appendLogByKey(targetKey, "info", `[global0001] command accepted: ${command}`);
       return;
     }
@@ -438,6 +459,9 @@ export function useControlPreviewState() {
       appendLogByKey(targetKey, "error", "实例未运行，命令发送失败。");
       return;
     }
+
+    commandInput.value = "";
+    appendLogByKey(targetKey, "command", `$ ${command}`);
 
     appendLogByKey(targetKey, "info", `[${target.displayName}] command accepted: ${command}`);
   };
@@ -489,6 +513,7 @@ export function useControlPreviewState() {
     startCurrentTarget,
     stopCurrentTarget,
     restartCurrentTarget,
+    terminateCurrentTarget,
     sendCommand
   };
 }

@@ -1,3 +1,4 @@
+import { useDocumentVisibility } from "@/hooks/useDocumentVisibility";
 import { monitorOverview } from "@/services/apis";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { t } from "@/lang/i18n";
@@ -490,6 +491,7 @@ const buildGlobalMetricsFromLive = (node: MonitorNodeRecord): ControlDashboardMe
 };
 
 export function useControlDashboard(currentTarget: Readonly<Ref<ControlTarget | undefined>>) {
+  const { isDocumentVisible } = useDocumentVisibility();
   const { state: appState } = useAppStateStore();
   const result = monitorOverview();
 
@@ -602,12 +604,26 @@ export function useControlDashboard(currentTarget: Readonly<Ref<ControlTarget | 
     return liveState.value;
   };
 
-  onMounted(() => {
-    if (isLocalPreviewMode.value) return;
-    void refreshDashboard();
+  const clearRefreshTimer = () => {
+    if (timer.value) {
+      window.clearInterval(timer.value);
+      timer.value = undefined;
+    }
+  };
+
+  const startRefreshTimer = () => {
+    clearRefreshTimer();
+    if (isLocalPreviewMode.value || !isDocumentVisible.value) return;
+
     timer.value = window.setInterval(() => {
       void refreshDashboard(true);
     }, DASHBOARD_REFRESH_INTERVAL_MS);
+  };
+
+  onMounted(() => {
+    if (isLocalPreviewMode.value) return;
+    void refreshDashboard();
+    startRefreshTimer();
   });
 
   watch(
@@ -621,11 +637,20 @@ export function useControlDashboard(currentTarget: Readonly<Ref<ControlTarget | 
     { immediate: true }
   );
 
-  onUnmounted(() => {
-    if (timer.value) {
-      window.clearInterval(timer.value);
-      timer.value = undefined;
+  watch(isDocumentVisible, (visible) => {
+    if (isLocalPreviewMode.value) return;
+
+    if (!visible) {
+      clearRefreshTimer();
+      return;
     }
+
+    void refreshDashboard(true);
+    startRefreshTimer();
+  });
+
+  onUnmounted(() => {
+    clearRefreshTimer();
   });
 
   return {

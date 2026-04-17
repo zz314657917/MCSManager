@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import type { GmPanelActionPayload } from "@/hooks/useGmConsoleState";
 import { GM_MUTE_PRESETS, formatGmDateTime, formatGmRelativeSeconds } from "@/types/gm";
+import { Modal } from "ant-design-vue";
 import { computed, ref, watch } from "vue";
 
 type ExecuteHandler = (payload: GmPanelActionPayload) => boolean | Promise<boolean>;
+type ActionConfirmConfig = {
+  title: string;
+  content: string;
+  danger?: boolean;
+};
 
 const props = withDefaults(
   defineProps<{
@@ -12,15 +18,22 @@ const props = withDefaults(
     balances?: IMcsmGmPlayerBalances;
     luckPerms?: IMcsmLuckPermsSnapshot;
     moderation?: IMcsmGmModerationStatus;
+    inventory?: IMcsmGmPlayerInventorySnapshot;
     auditRecords?: IMcsmGmAuditRecord[];
     lastActionResult?: IMcsmGmActionResult;
     busy?: boolean;
+    showInventory?: boolean;
+    inventoryLoading?: boolean;
     onExecute?: ExecuteHandler;
+    onRefreshInventory?: () => void | Promise<void>;
   }>(),
   {
     auditRecords: () => [],
     busy: false,
-    onExecute: undefined
+    showInventory: false,
+    inventoryLoading: false,
+    onExecute: undefined,
+    onRefreshInventory: undefined
   }
 );
 
@@ -36,6 +49,14 @@ const muteReason = ref("违规发言");
 const customMuteMinutes = ref<number | undefined>(60);
 
 const numberFormatter = new Intl.NumberFormat("zh-CN");
+const createEmptyInventorySlot = (
+  section: IMcsmGmInventorySlot["section"],
+  slot: number
+): IMcsmGmInventorySlot => ({
+  section,
+  slot,
+  empty: true
+});
 
 const summaryItems = computed(() => {
   if (!props.player || !props.server) return [];
@@ -101,6 +122,31 @@ const assetAuditRecords = computed(() =>
 );
 
 const recentAuditRecords = computed(() => props.auditRecords.slice(0, 20));
+const inventorySideSlots = computed(() => {
+  const source = props.inventory?.slots || [];
+  const findSlot = (section: IMcsmGmInventorySlot["section"], slot: number) =>
+    source.find((item) => item.section === section && item.slot === slot) || createEmptyInventorySlot(section, slot);
+
+  return [
+    { label: "头盔", slot: findSlot("armor", 0) },
+    { label: "胸甲", slot: findSlot("armor", 1) },
+    { label: "护腿", slot: findSlot("armor", 2) },
+    { label: "靴子", slot: findSlot("armor", 3) },
+    { label: "副手", slot: findSlot("offhand", 0) }
+  ];
+});
+const inventoryMainSlots = computed(() => {
+  const source = props.inventory?.slots || [];
+  return Array.from({ length: 27 }, (_, slot) =>
+    source.find((item) => item.section === "main" && item.slot === slot) || createEmptyInventorySlot("main", slot)
+  );
+});
+const inventoryHotbarSlots = computed(() => {
+  const source = props.inventory?.slots || [];
+  return Array.from({ length: 9 }, (_, slot) =>
+    source.find((item) => item.section === "hotbar" && item.slot === slot) || createEmptyInventorySlot("hotbar", slot)
+  );
+});
 
 const hasPlayer = computed(() => Boolean(props.player && props.server));
 const currentPrimaryGroup = computed(() => props.luckPerms?.primaryGroup || "--");
@@ -149,6 +195,63 @@ const formatGrantState = (expiresAt?: string, temporary?: boolean) => {
   return expiresAt ? `临时至 ${formatGmDateTime(expiresAt)}` : "临时";
 };
 
+const resolveInventorySlotTitle = (slot: IMcsmGmInventorySlot) =>
+  slot.displayName || slot.rawTypeName || slot.material || "空槽位";
+
+const resolveInventorySlotMeta = (slot: IMcsmGmInventorySlot) => {
+  if (slot.empty) return "空槽位";
+  const parts: string[] = [];
+  if (slot.rawTypeName && slot.rawTypeName !== slot.material) {
+    parts.push(slot.rawTypeName);
+  } else if (slot.material) {
+    parts.push(slot.material);
+  }
+  if (slot.maxDurability != null && slot.durability != null) {
+    parts.push(`耐久 ${Math.max(0, slot.maxDurability - slot.durability)} / ${slot.maxDurability}`);
+  }
+  return parts.join(" · ");
+};
+
+const resolveInventorySlotAccent = (slot: IMcsmGmInventorySlot) => {
+  if (slot.empty) return "";
+  const material = String(slot.material || slot.rawTypeName || "").toUpperCase();
+  if (material.includes("SWORD") || material.includes("AXE") || material.includes("BOW")) return "is-weapon";
+  if (
+    material.includes("HELMET") ||
+    material.includes("CHESTPLATE") ||
+    material.includes("LEGGINGS") ||
+    material.includes("BOOTS")
+  ) {
+    return "is-armor";
+  }
+  if (
+    material.includes("APPLE") ||
+    material.includes("BEEF") ||
+    material.includes("BREAD") ||
+    material.includes("CARROT")
+  ) {
+    return "is-food";
+  }
+  if (material.includes("TOTEM") || material.includes("SHIELD")) return "is-special";
+  return "is-item";
+};
+
+const resolveInventorySlotGlyph = (slot: IMcsmGmInventorySlot) => {
+  const source = resolveInventorySlotTitle(slot).replace(/§./g, "").trim();
+  if (!source || slot.empty) return "--";
+  return source.slice(0, 2).toUpperCase();
+};
+
+const formatInventoryEnchants = (slot: IMcsmGmInventorySlot) =>
+  (slot.enchants || []).map((item) => `${item.key} ${item.level}`).join(" / ");
+
+const formatInventoryLore = (slot: IMcsmGmInventorySlot) => (slot.lore || []).join(" / ");
+
+const refreshInventory = async () => {
+  if (!props.onRefreshInventory || props.inventoryLoading) return;
+  await props.onRefreshInventory();
+};
+
 const getActionLabel = (kind: string) => {
   switch (kind) {
     case "economy_deposit":
@@ -186,13 +289,96 @@ const getActionLabel = (kind: string) => {
   }
 };
 
-const runAction = async (payload: GmPanelActionPayload, onSuccess?: () => void) => {
+const buildActionConfirmConfig = (payload: GmPanelActionPayload): ActionConfirmConfig | undefined => {
+  const playerName = props.player?.playerName || "当前玩家";
+
+  switch (payload.kind) {
+    case "economy_withdraw":
+      return {
+        title: "确认扣金币",
+        content: `将从 ${playerName} 扣除 ${formatAmount(payload.amount)} 金币。`,
+        danger: true
+      };
+    case "points_take":
+      return {
+        title: "确认扣点券",
+        content: `将从 ${playerName} 扣除 ${formatAmount(payload.amount)} 点券。`,
+        danger: true
+      };
+    case "lp_group_switch":
+      return {
+        title: "确认切换主组",
+        content: `将把 ${playerName} 的主组从 ${currentPrimaryGroup.value} 切换到 ${payload.group}。`,
+        danger: true
+      };
+    case "lp_group_remove":
+      return {
+        title: "确认移除权限组",
+        content: `将从 ${playerName} 移除权限组 ${payload.group}。`,
+        danger: true
+      };
+    case "lp_temp_group_remove":
+      return {
+        title: "确认移除临时组",
+        content: `将从 ${playerName} 移除临时组 ${payload.group}。`,
+        danger: true
+      };
+    case "lp_permission_unset":
+      return {
+        title: "确认移除权限节点",
+        content: `将从 ${playerName} 移除权限节点 ${payload.node}。`,
+        danger: true
+      };
+    case "lp_temp_permission_unset":
+      return {
+        title: "确认移除临时权限",
+        content: `将从 ${playerName} 移除临时权限 ${payload.node}。`,
+        danger: true
+      };
+    case "chat_mute":
+      return {
+        title: "确认禁言玩家",
+        content: `将禁言 ${playerName} ${formatGmRelativeSeconds(payload.durationSeconds)}，原因：${payload.reason || "违规发言"}。`,
+        danger: true
+      };
+    case "chat_unmute":
+      return {
+        title: "确认解除禁言",
+        content: `将解除 ${playerName} 的禁言状态。`,
+        danger: true
+      };
+    default:
+      return undefined;
+  }
+};
+
+const executeAction = async (payload: GmPanelActionPayload, onSuccess?: () => void) => {
   if (!hasPlayer.value || props.busy || !props.onExecute) return false;
   const result = await props.onExecute(payload);
   if (result) {
     onSuccess?.();
   }
   return Boolean(result);
+};
+
+const runAction = async (payload: GmPanelActionPayload, onSuccess?: () => void) => {
+  const confirmConfig = buildActionConfirmConfig(payload);
+  if (!confirmConfig) {
+    return executeAction(payload, onSuccess);
+  }
+
+  Modal.confirm({
+    title: confirmConfig.title,
+    content: confirmConfig.content,
+    okText: "确认执行",
+    cancelText: "取消",
+    okButtonProps: confirmConfig.danger ? { danger: true } : undefined,
+    async onOk() {
+      return executeAction(payload, onSuccess);
+    }
+  });
+
+  return true;
 };
 
 const executeEconomyAction = (kind: "economy_deposit" | "economy_withdraw") => {
@@ -317,7 +503,7 @@ const executeUnmute = () =>
 </script>
 
 <template>
-  <div class="gm-operations-panel">
+  <div class="gm-operations-panel" data-testid="gm-operations-panel">
     <a-empty
       v-if="!hasPlayer"
       :image="false"
@@ -352,9 +538,135 @@ const executeUnmute = () =>
           v-if="lastActionResult"
           class="gm-operations-panel__result"
           :class="{ 'is-failed': !lastActionResult.success }"
+          data-testid="gm-last-action-result"
         >
           <strong>{{ getActionLabel(lastActionResult.kind) }}</strong>
           <span>{{ lastActionResult.message }}</span>
+        </div>
+      </section>
+
+      <section v-if="showInventory" class="gm-operations-panel__card" data-testid="gm-inventory-section">
+        <div class="gm-operations-panel__section-head">
+          <div>
+            <h3>玩家背包</h3>
+            <span>{{ inventory?.updatedAt ? `最近刷新：${formatGmDateTime(inventory.updatedAt)}` : "按需读取当前在线玩家背包" }}</span>
+          </div>
+          <a-button
+            size="small"
+            :loading="inventoryLoading"
+            :disabled="busy || inventoryLoading || !player?.online"
+            data-testid="gm-inventory-refresh"
+            @click="refreshInventory"
+          >
+            刷新背包
+          </a-button>
+        </div>
+
+        <a-empty
+          v-if="!inventory?.available"
+          :image="false"
+          description="当前未获取到背包快照。"
+        />
+
+        <div v-else class="gm-operations-panel__inventory-layout">
+          <div class="gm-operations-panel__inventory-cluster">
+            <div class="gm-operations-panel__inventory-subhead">装备栏</div>
+            <div class="gm-operations-panel__inventory-side">
+              <div
+                v-for="entry in inventorySideSlots"
+                :key="`${entry.label}:${entry.slot.slot}`"
+                class="gm-operations-panel__inventory-side-entry"
+              >
+                <span>{{ entry.label }}</span>
+                <a-popover :trigger="['hover', 'click']" placement="top">
+                  <template #content>
+                    <div class="gm-operations-panel__inventory-popover">
+                      <strong>{{ resolveInventorySlotTitle(entry.slot) }}</strong>
+                      <div>{{ resolveInventorySlotMeta(entry.slot) }}</div>
+                      <div v-if="entry.slot.enchants?.length">附魔：{{ formatInventoryEnchants(entry.slot) }}</div>
+                      <div v-if="entry.slot.lore?.length">Lore：{{ formatInventoryLore(entry.slot) }}</div>
+                    </div>
+                  </template>
+
+                  <button
+                    type="button"
+                    class="gm-operations-panel__inventory-slot"
+                    :class="[resolveInventorySlotAccent(entry.slot), { 'is-empty': entry.slot.empty }]"
+                  >
+                    <strong>{{ resolveInventorySlotGlyph(entry.slot) }}</strong>
+                    <span
+                      v-if="entry.slot.amount && entry.slot.amount > 1"
+                      class="gm-operations-panel__inventory-amount"
+                    >
+                      {{ entry.slot.amount }}
+                    </span>
+                  </button>
+                </a-popover>
+              </div>
+            </div>
+          </div>
+
+          <div class="gm-operations-panel__inventory-cluster gm-operations-panel__inventory-main">
+            <div class="gm-operations-panel__inventory-subhead">主背包</div>
+            <div class="gm-operations-panel__inventory-grid" data-testid="gm-inventory-main-grid">
+              <a-popover
+                v-for="slot in inventoryMainSlots"
+                :key="`main:${slot.slot}`"
+                :trigger="['hover', 'click']"
+                placement="top"
+              >
+                <template #content>
+                  <div class="gm-operations-panel__inventory-popover">
+                    <strong>{{ resolveInventorySlotTitle(slot) }}</strong>
+                    <div>{{ resolveInventorySlotMeta(slot) }}</div>
+                    <div v-if="slot.enchants?.length">附魔：{{ formatInventoryEnchants(slot) }}</div>
+                    <div v-if="slot.lore?.length">Lore：{{ formatInventoryLore(slot) }}</div>
+                  </div>
+                </template>
+
+                <button
+                  type="button"
+                  class="gm-operations-panel__inventory-slot"
+                  :class="[resolveInventorySlotAccent(slot), { 'is-empty': slot.empty }]"
+                >
+                  <strong>{{ resolveInventorySlotGlyph(slot) }}</strong>
+                  <span v-if="slot.amount && slot.amount > 1" class="gm-operations-panel__inventory-amount">
+                    {{ slot.amount }}
+                  </span>
+                </button>
+              </a-popover>
+            </div>
+
+            <div class="gm-operations-panel__inventory-hotbar-label">快捷栏</div>
+            <div class="gm-operations-panel__inventory-grid gm-operations-panel__inventory-grid--hotbar">
+              <a-popover
+                v-for="slot in inventoryHotbarSlots"
+                :key="`hotbar:${slot.slot}`"
+                :trigger="['hover', 'click']"
+                placement="top"
+              >
+                <template #content>
+                  <div class="gm-operations-panel__inventory-popover">
+                    <strong>{{ resolveInventorySlotTitle(slot) }}</strong>
+                    <div>{{ resolveInventorySlotMeta(slot) }}</div>
+                    <div v-if="slot.enchants?.length">附魔：{{ formatInventoryEnchants(slot) }}</div>
+                    <div v-if="slot.lore?.length">Lore：{{ formatInventoryLore(slot) }}</div>
+                  </div>
+                </template>
+
+                <button
+                  type="button"
+                  class="gm-operations-panel__inventory-slot"
+                  :class="[resolveInventorySlotAccent(slot), { 'is-empty': slot.empty }]"
+                >
+                  <strong>{{ resolveInventorySlotGlyph(slot) }}</strong>
+                  <span v-if="slot.amount && slot.amount > 1" class="gm-operations-panel__inventory-amount">
+                    {{ slot.amount }}
+                  </span>
+                </button>
+              </a-popover>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -365,7 +677,9 @@ const executeUnmute = () =>
               <h3>金币</h3>
               <span>Vault Economy</span>
             </div>
-            <strong>{{ balances?.economyAvailable ? formatAmount(balances?.economyBalance) : "--" }}</strong>
+            <strong data-testid="gm-economy-balance">
+              {{ balances?.economyAvailable ? formatAmount(balances?.economyBalance) : "--" }}
+            </strong>
           </div>
 
           <div class="gm-operations-panel__action-row">
@@ -375,11 +689,13 @@ const executeUnmute = () =>
               :min="1"
               :precision="0"
               :disabled="busy || !balances?.economyAvailable"
+              data-testid="gm-economy-amount"
             />
             <a-button
               type="primary"
               :loading="busy"
               :disabled="!balances?.economyAvailable"
+              data-testid="gm-economy-deposit"
               @click="executeEconomyAction('economy_deposit')"
             >
               加钱
@@ -387,6 +703,7 @@ const executeUnmute = () =>
             <a-button
               :loading="busy"
               :disabled="!balances?.economyAvailable"
+              data-testid="gm-economy-withdraw"
               @click="executeEconomyAction('economy_withdraw')"
             >
               扣钱
@@ -400,7 +717,9 @@ const executeUnmute = () =>
               <h3>点券</h3>
               <span>PlayerPoints</span>
             </div>
-            <strong>{{ balances?.pointsAvailable ? formatAmount(balances?.pointsBalance) : "--" }}</strong>
+            <strong data-testid="gm-points-balance">
+              {{ balances?.pointsAvailable ? formatAmount(balances?.pointsBalance) : "--" }}
+            </strong>
           </div>
 
           <div class="gm-operations-panel__action-row">
@@ -410,11 +729,13 @@ const executeUnmute = () =>
               :min="1"
               :precision="0"
               :disabled="busy || !balances?.pointsAvailable"
+              data-testid="gm-points-amount"
             />
             <a-button
               type="primary"
               :loading="busy"
               :disabled="!balances?.pointsAvailable"
+              data-testid="gm-points-give"
               @click="executePointsAction('points_give')"
             >
               加点
@@ -422,6 +743,7 @@ const executeUnmute = () =>
             <a-button
               :loading="busy"
               :disabled="!balances?.pointsAvailable"
+              data-testid="gm-points-take"
               @click="executePointsAction('points_take')"
             >
               扣点
@@ -609,16 +931,19 @@ const executeUnmute = () =>
                 v-model:value="temporaryPermissionNode"
                 placeholder="临时权限节点"
                 :disabled="busy || !luckPerms?.available"
+                data-testid="gm-temp-permission-node"
               />
               <a-input
                 v-model:value="temporaryPermissionDuration"
                 placeholder="时长，如 7d"
                 :disabled="busy || !luckPerms?.available"
+                data-testid="gm-temp-permission-duration"
               />
               <a-button
                 type="primary"
                 :loading="busy"
                 :disabled="!luckPerms?.available"
+                data-testid="gm-temp-permission-add"
                 @click="executeTempPermissionAdd"
               >
                 添加临时权限
@@ -850,6 +1175,138 @@ const executeUnmute = () =>
   color: #991b1b;
 }
 
+.gm-operations-panel__inventory-layout {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.gm-operations-panel__inventory-cluster {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gm-operations-panel__inventory-subhead,
+.gm-operations-panel__inventory-hotbar-label {
+  color: var(--color-gray-7);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.gm-operations-panel__inventory-side {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, var(--gm-inventory-slot-size, 64px)));
+  gap: 10px;
+  justify-content: start;
+}
+
+.gm-operations-panel__inventory-side-entry {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.gm-operations-panel__inventory-side-entry span,
+.gm-operations-panel__inventory-popover div {
+  color: var(--color-gray-7);
+  font-size: 12px;
+}
+
+.gm-operations-panel__inventory-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gm-operations-panel__inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, var(--gm-inventory-slot-size, 64px)));
+  gap: 8px;
+  justify-content: start;
+  min-width: 0;
+}
+
+.gm-operations-panel__inventory-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(226, 232, 240, 0.92));
+  color: var(--color-gray-9);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.gm-operations-panel__inventory-slot strong {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.gm-operations-panel__inventory-slot.is-empty {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(226, 232, 240, 0.52));
+  color: var(--color-gray-6);
+  cursor: default;
+}
+
+.gm-operations-panel__inventory-slot.is-weapon {
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98), rgba(254, 226, 226, 0.94));
+  color: #b91c1c;
+}
+
+.gm-operations-panel__inventory-slot.is-armor {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.94));
+  color: #1d4ed8;
+}
+
+.gm-operations-panel__inventory-slot.is-food {
+  background: linear-gradient(180deg, rgba(254, 249, 195, 0.98), rgba(254, 240, 138, 0.94));
+  color: #a16207;
+}
+
+.gm-operations-panel__inventory-slot.is-special {
+  background: linear-gradient(180deg, rgba(240, 253, 250, 0.98), rgba(204, 251, 241, 0.94));
+  color: #0f766e;
+}
+
+.gm-operations-panel__inventory-slot.is-item {
+  background: linear-gradient(180deg, rgba(243, 244, 246, 0.98), rgba(229, 231, 235, 0.94));
+  color: #374151;
+}
+
+.gm-operations-panel__inventory-amount {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.gm-operations-panel__inventory-popover {
+  display: grid;
+  gap: 6px;
+  max-width: 280px;
+  word-break: break-word;
+}
+
+.gm-operations-panel__inventory-popover strong {
+  color: var(--color-gray-9);
+}
+
+.gm-operations-panel__inventory-grid--hotbar {
+  padding-top: 4px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.22);
+}
+
 .gm-operations-panel__grid,
 .gm-operations-panel__history-grid,
 .gm-operations-panel__lp-grid {
@@ -1004,6 +1461,21 @@ const executeUnmute = () =>
 
   .gm-operations-panel__permission-main span {
     max-width: 100%;
+  }
+
+  .gm-operations-panel__inventory-side {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .gm-operations-panel__inventory-grid {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .gm-operations-panel__inventory-side-entry span,
+  .gm-operations-panel__inventory-subhead,
+  .gm-operations-panel__inventory-hotbar-label {
+    font-size: 11px;
   }
 }
 </style>

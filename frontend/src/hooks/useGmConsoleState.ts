@@ -8,6 +8,7 @@ import {
   gmPlayersApi,
   gmServersApi
 } from "@/services/apis";
+import { useDocumentVisibility } from "@/hooks/useDocumentVisibility";
 import {
   GM_AUDIT_PAGE_SIZE,
   GM_CHAT_PAGE_SIZE,
@@ -75,6 +76,7 @@ export type GmPanelActionPayload =
   | { kind: "chat_unmute" };
 
 export function useGmConsoleState() {
+  const { isDocumentVisible } = useDocumentVisibility();
   const serversRequest = gmServersApi();
   const balancesRequest = gmBalancesApi();
   const luckPermsRequest = gmLuckPermsApi();
@@ -486,7 +488,7 @@ export function useGmConsoleState() {
 
   const startPollers = () => {
     clearTimers();
-    if (!selectedServerKey.value) return;
+    if (!selectedServerKey.value || !isDocumentVisible.value) return;
 
     playerPollTimer = window.setInterval(() => {
       void loadAllPlayers(false);
@@ -630,6 +632,17 @@ export function useGmConsoleState() {
   onMounted(async () => {
     await refreshCurrent(true);
     startPollers();
+  });
+
+  watch(isDocumentVisible, (visible) => {
+    if (!visible) {
+      clearTimers();
+      return;
+    }
+
+    void refreshCurrent(true).finally(() => {
+      startPollers();
+    });
   });
 
   onUnmounted(() => {
