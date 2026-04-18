@@ -37,8 +37,13 @@ const designModeNavStyle = computed(() => {
   };
 });
 
-const isMinimalChrome = computed(() => route.meta.chromeMode === "minimal");
-const showSidebarLayoutChrome = computed(() => useSidebarLayout.value && !isMinimalChrome.value);
+const useTopNavOnDesktop = computed(
+  () => !isPhone.value && route.meta.desktopChromeMode === "top-nav"
+);
+const isMinimalChrome = computed(() => route.meta.chromeMode === "minimal" && !useTopNavOnDesktop.value);
+const showSidebarLayoutChrome = computed(
+  () => useSidebarLayout.value && !isMinimalChrome.value && !useTopNavOnDesktop.value
+);
 const showAppHeader = computed(() => !showSidebarLayoutChrome.value && !isMinimalChrome.value);
 const showBreadcrumbs = computed(() => !isMinimalChrome.value);
 const showBottomNav = computed(
@@ -55,13 +60,20 @@ onMounted(async () => {
 <template>
   <AppConfigProvider :has-bg-image="hasBgImage">
     <!-- App Container -->
-    <div class="global-app-container" :class="{ 'global-app-container--minimal': isMinimalChrome }">
+    <div
+      class="global-app-container"
+      :class="{
+        'global-app-container--minimal': isMinimalChrome,
+        'global-app-container--top-nav': useTopNavOnDesktop
+      }"
+    >
       <AppSidebarMenu v-if="showSidebarLayoutChrome" :style="designModeNavStyle" />
       <main
         class="main-content"
         :class="{
           'app-layout-sidebar-only': showSidebarLayoutChrome,
-          'main-content--minimal': isMinimalChrome
+          'main-content--minimal': isMinimalChrome,
+          'main-content--top-nav': useTopNavOnDesktop
         }"
       >
         <AppHeader v-if="showAppHeader" :style="designModeNavStyle" />
@@ -84,8 +96,17 @@ onMounted(async () => {
   margin: 0;
 }
 
+.global-app-container--top-nav {
+  max-width: 100%;
+  margin: 0;
+}
+
 .main-content--minimal {
   width: 100%;
   overflow: hidden;
+}
+
+.main-content--top-nav {
+  width: 100%;
 }
 </style>

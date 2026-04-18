@@ -9,6 +9,7 @@ import {
   ApartmentOutlined,
   AppstoreOutlined,
   AreaChartOutlined,
+  DesktopOutlined,
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
@@ -35,6 +36,7 @@ const isRouteActive = (path: string): boolean => {
 
 /** Sidebar icon for each route path */
 const routePathIcons: Record<string, Component> = {
+  "/control": DesktopOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
   "/overview": AreaChartOutlined,

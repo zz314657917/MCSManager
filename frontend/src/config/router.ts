@@ -29,6 +29,7 @@ export interface RouterMetaInfo {
   customClass?: string[];
   condition?: () => boolean;
   chromeMode?: "default" | "minimal";
+  desktopChromeMode?: "default" | "top-nav";
   breadcrumbs?: Array<{
     name: string;
     path: string;
@@ -98,7 +99,7 @@ const originRouterConfig: RouterConfig[] = [
       mainMenu: true,
       redirect: (user) => {
         if (user?.permission === ROLE.ADMIN) {
-          return "/instances";
+          return "/control";
         }
         if (user?.permission && user.permission >= ROLE.USER) {
           return "/customer";
@@ -114,8 +115,9 @@ const originRouterConfig: RouterConfig[] = [
     component: ControlConsole,
     meta: {
       permission: ROLE.ADMIN,
-      mainMenu: false,
-      chromeMode: "minimal"
+      mainMenu: true,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
     }
   },
   {
@@ -125,7 +127,8 @@ const originRouterConfig: RouterConfig[] = [
     meta: {
       permission: ROLE.ADMIN,
       mainMenu: false,
-      chromeMode: "minimal"
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
     }
   },
   {
@@ -135,7 +138,8 @@ const originRouterConfig: RouterConfig[] = [
     meta: {
       permission: ROLE.ADMIN,
       mainMenu: false,
-      chromeMode: "minimal"
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
     }
   },
   {

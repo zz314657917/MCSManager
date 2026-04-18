@@ -16,6 +16,7 @@ import {
   CONTROL_MAX_LOG_LINES,
   CONTROL_OUTPUT_LOG_SIZE,
   CONTROL_POLL_INTERVAL_MS,
+  collectDaemonIdsToHydrate,
   createControlLogLine,
   createControlTargetKey,
   normalizeControlOutputLog,
@@ -110,6 +111,7 @@ export function useControlPanelState() {
 
   const targetLoaders = new Map<string, Promise<void>>();
   let pollTimer: number | undefined;
+  let hydrateRetryTimer: number | undefined;
 
   const getGlobalTargetStatus = (daemonId: string, daemonAvailable: boolean) => {
     if (!daemonAvailable) return INSTANCE_STATUS_CODE.STOPPED;
@@ -232,6 +234,13 @@ export function useControlPanelState() {
     if (pollTimer) {
       window.clearInterval(pollTimer);
       pollTimer = undefined;
+    }
+  };
+
+  const clearHydrateRetryTimer = () => {
+    if (hydrateRetryTimer) {
+      window.clearTimeout(hydrateRetryTimer);
+      hydrateRetryTimer = undefined;
     }
   };
 
@@ -446,6 +455,53 @@ export function useControlPanelState() {
     }
   };
 
+  const hydrateAvailableDaemonTargets = async (
+    options: {
+      excludeDaemonId?: string;
+      forceRequest?: boolean;
+      scheduleRetry?: boolean;
+    } = {}
+  ) => {
+    const daemonIds = collectDaemonIdsToHydrate(nodes.value, loadedDaemons.value, {
+      excludeDaemonId: options.excludeDaemonId,
+      forceRequest: options.forceRequest
+    });
+
+    if (!daemonIds.length) return;
+
+    const results = await Promise.allSettled(
+      daemonIds.map((daemonId) =>
+        loadTargetsForDaemon(daemonId, {
+          forceRequest: options.forceRequest,
+          showToastOnError: false
+        })
+      )
+    );
+
+    if (!options.scheduleRetry) return;
+
+    const failedDaemonIds = daemonIds.filter(
+      (daemonId, index) =>
+        results[index]?.status === "rejected" || !loadedDaemons.value[daemonId]
+    );
+
+    if (!failedDaemonIds.length) return;
+
+    clearHydrateRetryTimer();
+    hydrateRetryTimer = window.setTimeout(() => {
+      void Promise.allSettled(
+        failedDaemonIds.map((daemonId) =>
+          loadTargetsForDaemon(daemonId, {
+            forceRequest: true,
+            showToastOnError: false
+          })
+        )
+      ).finally(() => {
+        hydrateRetryTimer = undefined;
+      });
+    }, 1500);
+  };
+
   const applyOutputSnapshot = (targetKey: string, rawOutput: string) => {
     const normalizedOutput = normalizeControlOutputLog(rawOutput);
     const previousOutput = rawOutputByTarget.value[targetKey] || "";
@@ -600,6 +656,12 @@ export function useControlPanelState() {
   const selectTarget = (target: ControlTarget) => {
     selectedDaemonId.value = target.daemonId;
     selectedTargetKey.value = createControlTargetKey(target);
+
+    if (!loadedDaemons.value[target.daemonId]) {
+      void loadTargetsForDaemon(target.daemonId, {
+        showToastOnError: false
+      });
+    }
   };
 
   const refreshCurrentTarget = async () => {
@@ -618,6 +680,9 @@ export function useControlPanelState() {
       await loadTargetsForDaemon(daemonId, {
         forceRequest: true,
         showToastOnError: true
+      });
+      void hydrateAvailableDaemonTargets({
+        excludeDaemonId: daemonId
       });
 
       const nextTarget = findTargetByKey(target ? createControlTargetKey(target) : currentTargetKey.value);
@@ -964,6 +1029,11 @@ export function useControlPanelState() {
     await loadTargetsForDaemon(selectedDaemonId.value, {
       showToastOnError: true
     });
+
+    void hydrateAvailableDaemonTargets({
+      excludeDaemonId: selectedDaemonId.value,
+      scheduleRetry: true
+    });
   });
 
   watch(isDocumentVisible, (visible) => {
@@ -989,6 +1059,9 @@ export function useControlPanelState() {
           forceRequest: true,
           showToastOnError: true
         });
+        void hydrateAvailableDaemonTargets({
+          excludeDaemonId: daemonId
+        });
       })().finally(() => {
         startPoller();
       });
@@ -1002,6 +1075,7 @@ export function useControlPanelState() {
 
   onUnmounted(() => {
     clearPollTimer();
+    clearHydrateRetryTimer();
     targetLoaders.clear();
   });
 

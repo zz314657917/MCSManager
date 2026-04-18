@@ -30,7 +30,12 @@ test("control desktop preview supports target switch and command flow", async ({
   await expect(terminal).toContainText("$ list");
   await expect(terminal).toContainText("[Lobby] command accepted: list");
 
+  await page.getByTestId("control-actions-slot").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("control-actions-desktop")).toBeInViewport();
   await page.getByTestId("control-action-stop").click();
+  const stopConfirmDialog = page.locator(".ant-modal-confirm");
+  await expect(stopConfirmDialog).toContainText(/确认停止当前实例|Stop Instance|Are you sure/);
+  await stopConfirmDialog.getByRole("button", { name: /停止实例|Stop Instance/ }).click();
   await expect(terminal).toContainText("[instance] Lobby stopped.");
 
   await page.getByTestId("control-action-start").click();

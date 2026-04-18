@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeControlOutputLog, splitControlOutputLog } from "./control";
+import {
+  collectDaemonIdsToHydrate,
+  normalizeControlOutputLog,
+  splitControlOutputLog
+} from "./control";
 
 describe("control output normalization", () => {
   it("removes ansi escape sequences and transient prompt lines from polled snapshots", () => {
@@ -62,5 +66,45 @@ describe("control output normalization", () => {
     expect(normalizeControlOutputLog(rawOutput)).toBe(
       "[16:10:29] [Server thread/INFO]: For next page perform cmi ? 2"
     );
+  });
+});
+
+describe("control panel target hydration", () => {
+  it("collects only online daemons that still need background target hydration", () => {
+    expect(
+      collectDaemonIdsToHydrate(
+        [
+          { daemonId: "daemon-a", daemonAvailable: true },
+          { daemonId: "daemon-b", daemonAvailable: true },
+          { daemonId: "daemon-c", daemonAvailable: false },
+          { daemonId: "daemon-d", daemonAvailable: true }
+        ],
+        {
+          "daemon-d": true
+        },
+        {
+          excludeDaemonId: "daemon-a"
+        }
+      )
+    ).toEqual(["daemon-b"]);
+  });
+
+  it("includes already loaded daemons when forceRequest is enabled", () => {
+    expect(
+      collectDaemonIdsToHydrate(
+        [
+          { daemonId: "daemon-a", daemonAvailable: true },
+          { daemonId: "daemon-b", daemonAvailable: true },
+          { daemonId: "daemon-c", daemonAvailable: false }
+        ],
+        {
+          "daemon-a": true,
+          "daemon-b": true
+        },
+        {
+          forceRequest: true
+        }
+      )
+    ).toEqual(["daemon-a", "daemon-b"]);
   });
 });

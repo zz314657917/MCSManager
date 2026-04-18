@@ -9,16 +9,18 @@ import { useScreen } from "@/hooks/useScreen";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { createGmServerKey, formatGmDateTime } from "@/types/gm";
 import {
+  AppstoreOutlined,
   CloudServerOutlined,
   MessageOutlined,
   TeamOutlined,
   ReloadOutlined
 } from "@ant-design/icons-vue";
 import { computed, nextTick, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const { isPhone } = useScreen();
 const route = useRoute();
+const router = useRouter();
 const { state: appState } = useAppStateStore();
 const chatBodyRef = ref<HTMLDivElement>();
 const operationsDrawerOpen = ref(false);
@@ -128,6 +130,14 @@ const handleSelectPlayer = (payload: { playerUuid: string; serverKey: string }) 
   }
 };
 
+const openControlPage = () => {
+  router.push("/control");
+};
+
+const openManagePage = () => {
+  router.push("/gm");
+};
+
 watch(
   () => messages.value.length,
   async () => {
@@ -163,6 +173,7 @@ watch(
       :show-sidebar-on-mobile="false"
       mobile-body-padding-bottom="12px"
       :mobile-nav-items="OPERATIONS_MOBILE_NAV_ITEMS"
+      :hide-desktop-header="true"
     >
       <template #header-actions="{ isPhone: shellIsPhone }">
         <template v-if="!shellIsPhone">
@@ -190,6 +201,47 @@ watch(
           </template>
         </a-button>
       </template>
+
+      <section v-if="!isPhone" class="gm-console-page__desktop-toolbar">
+        <div class="gm-console-page__desktop-toolbar-main">
+          <div class="gm-console-page__desktop-toolbar-title-wrap">
+            <div class="gm-console-page__desktop-toolbar-eyebrow">{{ pageEyebrow }}</div>
+            <div class="gm-console-page__desktop-toolbar-title">{{ pageTitle }}</div>
+          </div>
+
+          <div v-if="currentServer" class="gm-console-page__desktop-toolbar-pills">
+            <div class="gm-console-page__header-pill">
+              <CloudServerOutlined />
+              <span>{{ currentServer.daemonDisplayName }}</span>
+            </div>
+            <div class="gm-console-page__header-pill gm-console-page__header-pill--accent">
+              <TeamOutlined />
+              <span>{{ currentServer.instanceDisplayName }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="gm-console-page__desktop-toolbar-actions">
+          <a-button v-if="isChatPage" @click="openManagePage">
+            <template #icon>
+              <TeamOutlined />
+            </template>
+            <span>玩家管理</span>
+          </a-button>
+          <a-button v-else @click="openControlPage">
+            <template #icon>
+              <AppstoreOutlined />
+            </template>
+            <span>Control</span>
+          </a-button>
+          <a-button :loading="isRefreshing" @click="refreshCurrent(true)">
+            <template #icon>
+              <ReloadOutlined />
+            </template>
+            <span>刷新</span>
+          </a-button>
+        </div>
+      </section>
 
       <template #sidebar>
         <GmServerPlayerSidebar
@@ -395,6 +447,58 @@ watch(
 
 .gm-console-page__header-pill--accent {
   background: rgba(34, 197, 94, 0.16);
+}
+
+.gm-console-page__desktop-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 4px;
+}
+
+.gm-console-page__desktop-toolbar-main,
+.gm-console-page__desktop-toolbar-actions,
+.gm-console-page__desktop-toolbar-pills {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.gm-console-page__desktop-toolbar-main {
+  flex: 1;
+  justify-content: space-between;
+}
+
+.gm-console-page__desktop-toolbar-title-wrap {
+  min-width: 0;
+}
+
+.gm-console-page__desktop-toolbar-eyebrow {
+  color: var(--color-gray-7);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gm-console-page__desktop-toolbar-title {
+  margin-top: 4px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-gray-13);
+}
+
+.gm-console-page__desktop-toolbar .gm-console-page__header-pill {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: var(--color-gray-12);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.gm-console-page__desktop-toolbar .gm-console-page__header-pill--accent {
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .gm-console {

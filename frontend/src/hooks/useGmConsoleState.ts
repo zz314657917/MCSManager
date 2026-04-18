@@ -492,9 +492,6 @@ export function useGmConsoleState() {
 
     playerPollTimer = window.setInterval(() => {
       void loadAllPlayers(false);
-      if (selectedPlayerUuid.value) {
-        void loadPlayerDetails(false, selectedServerKey.value, selectedPlayerUuid.value);
-      }
     }, GM_PLAYER_POLL_INTERVAL_MS);
 
     chatPollTimer = window.setInterval(() => {

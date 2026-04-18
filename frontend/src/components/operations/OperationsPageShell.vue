@@ -16,6 +16,7 @@ const props = withDefaults(
     showSidebarOnMobile?: boolean;
     mobileBodyPaddingBottom?: string;
     mobileNavItems?: OperationsMobileNavItem[];
+    hideDesktopHeader?: boolean;
   }>(),
   {
     eyebrow: "",
@@ -24,7 +25,8 @@ const props = withDefaults(
     sidebarWidth: "320px",
     showSidebarOnMobile: true,
     mobileBodyPaddingBottom: "12px",
-    mobileNavItems: () => []
+    mobileNavItems: () => [],
+    hideDesktopHeader: false
   }
 );
 
@@ -57,8 +59,15 @@ const goBack = () => {
 </script>
 
 <template>
-  <div class="ops-page-shell">
-    <header class="ops-page-shell__header" :class="{ 'ops-page-shell__header--mobile': isPhone }">
+  <div
+    class="ops-page-shell"
+    :class="{ 'ops-page-shell--desktop-embedded': hideDesktopHeader && !isPhone }"
+  >
+    <header
+      v-if="!hideDesktopHeader || isPhone"
+      class="ops-page-shell__header"
+      :class="{ 'ops-page-shell__header--mobile': isPhone }"
+    >
       <div class="ops-page-shell__header-left">
         <a-button class="ops-page-shell__back-btn" @click="goBack">
           <template #icon>
@@ -123,6 +132,22 @@ const goBack = () => {
   flex-direction: column;
   background: var(--background-color);
   color: var(--text-color);
+}
+
+.ops-page-shell--desktop-embedded {
+  height: auto;
+  min-height: calc(100svh - 96px);
+  overflow: visible;
+}
+
+.ops-page-shell--desktop-embedded .ops-page-shell__shell,
+.ops-page-shell--desktop-embedded .ops-page-shell__workspace {
+  overflow: visible;
+}
+
+.ops-page-shell--desktop-embedded .ops-page-shell__shell {
+  padding: 16px;
+  gap: 16px;
 }
 
 .ops-page-shell__header {

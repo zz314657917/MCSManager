@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import ControlActionButtons from "@/components/control/ControlActionButtons.vue";
+import ControlActionButtons, {
+  type ControlFeatureShortcut
+} from "@/components/control/ControlActionButtons.vue";
 import GmOperationsPanel from "@/components/gm/GmOperationsPanel.vue";
 import { OPERATIONS_MOBILE_NAV_ITEMS } from "@/components/operations/mobileNav";
 import ControlTargetSelector from "@/components/control/ControlTargetSelector.vue";
@@ -10,32 +12,66 @@ import { useControlPlayerPanelPreviewState } from "@/hooks/useControlPlayerPanel
 import { useControlPlayerPanelState } from "@/hooks/useControlPlayerPanelState";
 import { useControlPreviewState } from "@/hooks/useControlPreviewState";
 import { useControlTargetFavorites } from "@/hooks/useControlTargetFavorites";
+import {
+  TYPE_MINECRAFT_JAVA,
+  TYPE_STEAM_SERVER_UNIVERSAL
+} from "@/hooks/useInstance";
+import { useServerConfig } from "@/hooks/useServerConfig";
 import { useScreen } from "@/hooks/useScreen";
 import { t } from "@/lang/i18n";
+import { getInstanceInfo as getInstanceInfoApi } from "@/services/apis/instance";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { useAppToolsStore } from "@/stores/useAppToolsStore";
 import { getControlTargetIdentity, getControlTargetStatusColor, getControlTargetStatusText } from "@/tools/controlStatus";
 import type { ControlLogLine, ControlTarget } from "@/types/control";
+import type { InstanceDetail } from "@/types";
+import EventConfig from "@/widgets/instance/dialogs/EventConfig.vue";
+import InstanceDetailDialog from "@/widgets/instance/dialogs/InstanceDetail.vue";
+import InstanceFundamentalDetail from "@/widgets/instance/dialogs/InstanceFundamentalDetail.vue";
+import JavaManager from "@/widgets/instance/dialogs/JavaManager.vue";
+import McPingSettings from "@/widgets/instance/dialogs/McPingSettings.vue";
+import RconSettings from "@/widgets/instance/dialogs/RconSettings.vue";
+import TermConfig from "@/widgets/instance/dialogs/TermConfig.vue";
 import { Modal } from "ant-design-vue";
 import {
+  AppstoreAddOutlined,
+  AppstoreOutlined,
+  BuildOutlined,
   CloudServerOutlined,
+  CodeOutlined,
+  ControlOutlined,
+  DashboardOutlined,
   DesktopOutlined,
+  FieldTimeOutlined,
+  FolderOpenOutlined,
   MenuUnfoldOutlined,
   ReloadOutlined,
   SendOutlined,
-  TeamOutlined
+  TeamOutlined,
+  UsergroupDeleteOutlined,
+  UsbOutlined
 } from "@ant-design/icons-vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
 const { isPhone } = useScreen();
-const { state: appState } = useAppStateStore();
+const { state: appState, isAdmin } = useAppStateStore();
 const { openInputDialog } = useAppToolsStore();
+const { refresh: refreshServerConfig, serverConfigFiles } = useServerConfig();
+const { execute: executeInstanceInfo } = getInstanceInfoApi();
 const logBodyRef = ref<HTMLDivElement>();
 const isMobileSelectorOpen = ref(false);
+const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
+const eventConfigDialog = ref<InstanceType<typeof EventConfig>>();
+const javaManagerDialog = ref<InstanceType<typeof JavaManager>>();
+const rconSettingsDialog = ref<InstanceType<typeof RconSettings>>();
+const mcPingSettingsDialog = ref<InstanceType<typeof McPingSettings>>();
+const instanceDetailDialog = ref<InstanceType<typeof InstanceDetailDialog>>();
+const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamentalDetail>>();
 const ALL_CONTROL_TARGETS_FILTER = "__all_control_targets__";
 const targetFilterDaemonId = ref(ALL_CONTROL_TARGETS_FILTER);
+const currentInstanceDetail = ref<InstanceDetail>();
 
 const isLocalPreviewMode = appState.userInfo?.token === "local-preview-token";
 const controlState = isLocalPreviewMode ? useControlPreviewState() : useControlPanelState();
@@ -158,31 +194,31 @@ const filteredTargetNodes = computed(() => {
 });
 
 const orderedCurrentTargets = computed(() => {
+  const globalTargets: ControlTarget[] = [];
   const favoriteTargets: ControlTarget[] = [];
   const groupedTargets: ControlTarget[] = [];
 
   for (const node of filteredTargetNodes.value) {
-    const nodeGlobals: ControlTarget[] = [];
     const nodeInstances: ControlTarget[] = [];
 
     for (const target of node.targets) {
-      if (target.mode === "instance" && isFavoriteTarget(target)) {
-        favoriteTargets.push(target);
+      if (target.mode === "global") {
+        globalTargets.push(target);
         continue;
       }
 
-      if (target.mode === "global") {
-        nodeGlobals.push(target);
+      if (isFavoriteTarget(target)) {
+        favoriteTargets.push(target);
         continue;
       }
 
       nodeInstances.push(target);
     }
 
-    groupedTargets.push(...nodeGlobals, ...nodeInstances);
+    groupedTargets.push(...nodeInstances);
   }
 
-  return [...favoriteTargets, ...groupedTargets];
+  return [...globalTargets, ...favoriteTargets, ...groupedTargets];
 });
 
 const getLogClass = (line: ControlLogLine) => `terminal-line--${line.level}`;
@@ -244,7 +280,227 @@ const openPlayersPage = () => {
   router.push("/gm");
 };
 
+const canFileManager = computed(() => appState.settings.canFileManager || isAdmin.value);
+
+const openLegacyInstancePage = () => {
+  if (!currentTarget.value) return;
+  router.push({
+    path: "/instances/terminal",
+    query: {
+      daemonId: currentTarget.value.daemonId,
+      instanceId: currentTarget.value.instanceId
+    }
+  });
+};
+
+const refreshCurrentInstanceDetail = async (forceRequest = false) => {
+  const target = currentTarget.value;
+  if (!target || target.mode !== "instance") {
+    currentInstanceDetail.value = undefined;
+    return undefined;
+  }
+
+  const response = await executeInstanceInfo({
+    params: {
+      uuid: target.instanceId,
+      daemonId: target.daemonId
+    },
+    forceRequest
+  });
+
+  currentInstanceDetail.value = response.value;
+  if (response.value?.config?.type) {
+    await refreshServerConfig(response.value.config.type, target.instanceId, target.daemonId);
+  }
+  return response.value;
+};
+
+const ensureCurrentInstanceDetail = async () => {
+  if (currentInstanceDetail.value?.instanceUuid === currentTarget.value?.instanceId) {
+    return currentInstanceDetail.value;
+  }
+  return refreshCurrentInstanceDetail(true);
+};
+
+const openControlFeatureRoute = (path: string, extraQuery: Record<string, any> = {}) => {
+  if (!currentTarget.value || currentTarget.value.mode !== "instance") return;
+  router.push({
+    path,
+    query: {
+      daemonId: currentTarget.value.daemonId,
+      instanceId: currentTarget.value.instanceId,
+      ...extraQuery
+    }
+  });
+};
+
+const openControlDialog = async (
+  dialog:
+    | InstanceType<typeof TermConfig>
+    | InstanceType<typeof EventConfig>
+    | InstanceType<typeof JavaManager>
+    | InstanceType<typeof RconSettings>
+    | InstanceType<typeof McPingSettings>
+    | InstanceType<typeof InstanceDetailDialog>
+    | InstanceType<typeof InstanceFundamentalDetail>
+    | undefined
+) => {
+  if (!dialog || !currentTarget.value || currentTarget.value.mode !== "instance") return;
+  await ensureCurrentInstanceDetail();
+  await nextTick();
+  dialog.openDialog();
+};
+
+const controlFeatureItems = computed<ControlFeatureShortcut[]>(() => {
+  const target = currentTarget.value;
+  if (!target || target.mode !== "instance") return [];
+
+  const items: ControlFeatureShortcut[] = [
+    {
+      key: "legacy-terminal",
+      title: t("TXT_CODE_524e3036"),
+      icon: CodeOutlined,
+      click: openLegacyInstancePage
+    },
+    {
+      key: "server-config",
+      title: t("TXT_CODE_d07742fe"),
+      icon: ControlOutlined,
+      disabled: !serverConfigFiles.value?.length,
+      click: () =>
+        openControlFeatureRoute("/instances/terminal/serverConfig", {
+          type: target.instanceType
+        })
+    },
+    {
+      key: "schedule",
+      title: t("TXT_CODE_b7d026f8"),
+      icon: FieldTimeOutlined,
+      click: () => openControlFeatureRoute("/instances/schedule")
+    },
+    {
+      key: "term-config",
+      title: t("TXT_CODE_d23631cb"),
+      icon: CodeOutlined,
+      click: () => void openControlDialog(terminalConfigDialog.value)
+    },
+    {
+      key: "event-config",
+      title: t("TXT_CODE_10150756"),
+      icon: DashboardOutlined,
+      click: () => void openControlDialog(eventConfigDialog.value)
+    }
+  ];
+
+  if (canFileManager.value) {
+    items.splice(1, 0, {
+      key: "file-manager",
+      title: t("TXT_CODE_ae533703"),
+      icon: FolderOpenOutlined,
+      click: () => openControlFeatureRoute("/instances/terminal/files")
+    });
+  }
+
+  const isMinecraftType =
+    target.instanceType?.startsWith("minecraft/java") ||
+    target.instanceType?.startsWith("minecraft/bedrock");
+
+  if (isMinecraftType && canFileManager.value) {
+    items.splice(canFileManager.value ? 3 : 2, 0, {
+      key: "mod-manager",
+      title: t("TXT_CODE_MOD_MANAGER"),
+      icon: UsbOutlined,
+      click: () => openControlFeatureRoute("/instances/terminal/mods")
+    });
+  }
+
+  if (target.instanceType?.includes(TYPE_MINECRAFT_JAVA)) {
+    items.push({
+      key: "mc-ping",
+      title: t("TXT_CODE_40241d8e"),
+      icon: UsergroupDeleteOutlined,
+      click: () => void openControlDialog(mcPingSettingsDialog.value)
+    });
+  }
+
+  if (
+    target.instanceType?.includes(TYPE_MINECRAFT_JAVA) &&
+    currentInstanceDetail.value?.config.processType === "general"
+  ) {
+    items.push({
+      key: "java-manager",
+      title: t("TXT_CODE_3fee13ed"),
+      icon: BuildOutlined,
+      click: () => void openControlDialog(javaManagerDialog.value)
+    });
+  }
+
+  if (target.instanceType?.includes(TYPE_STEAM_SERVER_UNIVERSAL)) {
+    items.push({
+      key: "rcon-settings",
+      title: t("TXT_CODE_282b0721"),
+      icon: BuildOutlined,
+      click: () => void openControlDialog(rconSettingsDialog.value)
+    });
+  }
+
+  if (isAdmin.value) {
+    items.push({
+      key: "instance-detail",
+      title: t("TXT_CODE_4f34fc28"),
+      icon: AppstoreAddOutlined,
+      click: () => void openControlDialog(instanceDetailDialog.value)
+    });
+  } else if (
+    currentInstanceDetail.value?.config.processType === "docker" &&
+    appState.settings.allowChangeCmd
+  ) {
+    items.push({
+      key: "instance-basic-detail",
+      title: t("TXT_CODE_4f34fc28"),
+      icon: AppstoreAddOutlined,
+      click: () => void openControlDialog(instanceFundamentalDetailDialog.value)
+    });
+  }
+
+  return items;
+});
+
 const currentOnlinePlayerCountText = computed(() => `${onlinePlayers.value.length}`);
+
+const handleStopCurrentTarget = () => {
+  if (!currentTarget.value) return;
+
+  Modal.confirm({
+    title: t("TXT_CODE_276756b2"),
+    content:
+      currentTarget.value.mode === "global"
+        ? "确认关闭宿主机模式终端吗？"
+        : "确认停止当前实例吗？",
+    okText: t("TXT_CODE_148d6467"),
+    cancelText: t("TXT_CODE_5366af54"),
+    okButtonProps: {
+      danger: true
+    },
+    async onOk() {
+      await stopCurrentTarget();
+    }
+  });
+};
+
+const handleRestartCurrentTarget = () => {
+  if (currentTarget.value?.mode !== "instance") return;
+
+  Modal.confirm({
+    title: t("TXT_CODE_276756b2"),
+    content: "确认重启当前实例吗？",
+    okText: t("TXT_CODE_77cc12da"),
+    cancelText: t("TXT_CODE_5366af54"),
+    async onOk() {
+      await restartCurrentTarget();
+    }
+  });
+};
 
 const handleTerminateCurrentTarget = () => {
   if (currentTarget.value?.mode !== "instance") return;
@@ -293,6 +549,23 @@ watch(
   },
   { deep: true }
 );
+
+watch(
+  () => currentTargetKey.value,
+  async () => {
+    if (currentTarget.value?.mode !== "instance") {
+      currentInstanceDetail.value = undefined;
+      return;
+    }
+
+    try {
+      await refreshCurrentInstanceDetail(true);
+    } catch {
+      currentInstanceDetail.value = undefined;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -305,6 +578,7 @@ watch(
       :show-sidebar-on-mobile="false"
       mobile-body-padding-bottom="12px"
       :mobile-nav-items="OPERATIONS_MOBILE_NAV_ITEMS"
+      :hide-desktop-header="true"
     >
       <template #header-actions="{ isPhone: shellIsPhone }">
         <a-button v-if="!shellIsPhone" @click="openPlayersPage">
@@ -312,6 +586,13 @@ watch(
             <TeamOutlined />
           </template>
           <span>GM 管理</span>
+        </a-button>
+
+        <a-button v-if="currentTarget && !shellIsPhone" @click="openLegacyInstancePage">
+          <template #icon>
+            <AppstoreOutlined />
+          </template>
+          <span>应用实例</span>
         </a-button>
 
         <template v-if="currentTarget && !shellIsPhone">
@@ -335,6 +616,49 @@ watch(
           <span v-if="!shellIsPhone">{{ t("TXT_CODE_REFRESH") }}</span>
         </a-button>
       </template>
+
+      <section v-if="!isPhone && currentTarget" class="control-console__desktop-toolbar">
+        <div class="control-console__desktop-toolbar-main">
+          <div class="control-console__desktop-toolbar-title-wrap">
+            <div class="control-console__desktop-toolbar-eyebrow">{{ controlEyebrow }}</div>
+            <div class="control-console__desktop-toolbar-title">{{ t("TXT_CODE_CONTROL_TITLE") }}</div>
+          </div>
+          <div class="control-console__desktop-toolbar-pills">
+            <div class="control-console__header-pill">
+              <CloudServerOutlined />
+              <span>{{ currentNode?.daemonDisplayName }}</span>
+            </div>
+            <div class="control-console__header-pill control-console__header-pill--accent">
+              <DesktopOutlined />
+              <span>{{ currentTargetTitle }}</span>
+            </div>
+            <a-tag class="control-console__mode-tag" :bordered="false">
+              {{ currentTargetModeText }}
+            </a-tag>
+          </div>
+        </div>
+
+        <div class="control-console__desktop-toolbar-actions">
+          <a-button @click="openPlayersPage">
+            <template #icon>
+              <TeamOutlined />
+            </template>
+            <span>GM 管理</span>
+          </a-button>
+          <a-button @click="openLegacyInstancePage">
+            <template #icon>
+              <AppstoreOutlined />
+            </template>
+            <span>应用实例</span>
+          </a-button>
+          <a-button :loading="isRefreshBusy" @click="handleRefresh">
+            <template #icon>
+              <ReloadOutlined />
+            </template>
+            <span>{{ t("TXT_CODE_REFRESH") }}</span>
+          </a-button>
+        </div>
+      </section>
 
       <template #mobile-prelude>
         <section v-if="isPhone && currentTarget" class="control-console__mobile-switcher">
@@ -590,9 +914,10 @@ watch(
             :mobile="isPhone"
             :primary-action-label="primaryActionLabel"
             :mode-text="currentTargetModeText"
+            :features="controlFeatureItems"
             @start="startCurrentTarget"
-            @stop="stopCurrentTarget"
-            @restart="restartCurrentTarget"
+            @stop="handleStopCurrentTarget"
+            @restart="handleRestartCurrentTarget"
             @terminate="handleTerminateCurrentTarget"
           />
         </div>
@@ -665,6 +990,61 @@ watch(
         />
       </div>
     </a-modal>
+
+    <TermConfig
+      ref="terminalConfigDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
+
+    <EventConfig
+      ref="eventConfigDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
+
+    <JavaManager
+      ref="javaManagerDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+    />
+
+    <RconSettings
+      ref="rconSettingsDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
+
+    <McPingSettings
+      ref="mcPingSettingsDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
+
+    <InstanceDetailDialog
+      ref="instanceDetailDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
+
+    <InstanceFundamentalDetail
+      ref="instanceFundamentalDetailDialog"
+      :instance-info="currentInstanceDetail"
+      :instance-id="currentTarget?.mode === 'instance' ? currentTarget.instanceId : ''"
+      :daemon-id="currentTarget?.mode === 'instance' ? currentTarget.daemonId : ''"
+      @update="() => void refreshCurrentInstanceDetail(true)"
+    />
   </div>
 </template>
 
@@ -676,6 +1056,47 @@ watch(
       radial-gradient(circle at top right, rgba(22, 163, 74, 0.12), transparent 28%),
       var(--background-color);
   }
+}
+
+.control-console__desktop-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 4px;
+}
+
+.control-console__desktop-toolbar-main,
+.control-console__desktop-toolbar-actions,
+.control-console__desktop-toolbar-pills {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.control-console__desktop-toolbar-main {
+  flex: 1;
+  justify-content: space-between;
+}
+
+.control-console__desktop-toolbar-title-wrap {
+  min-width: 0;
+}
+
+.control-console__desktop-toolbar-eyebrow {
+  color: var(--color-gray-7);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.control-console__desktop-toolbar-title {
+  margin-top: 4px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-gray-13);
 }
 
 .control-console__header-pill {
@@ -706,6 +1127,22 @@ watch(
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
   color: var(--color-always-white);
+}
+
+.control-console__desktop-toolbar .control-console__header-pill {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  color: var(--color-gray-12);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.control-console__desktop-toolbar .control-console__header-pill--accent {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.control-console__desktop-toolbar .control-console__mode-tag {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--color-primary);
 }
 
 .control-console__mobile-switcher {
@@ -794,14 +1231,22 @@ watch(
 }
 
 @media (min-width: 993px) {
+  .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__shell),
+  .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__workspace) {
+    overflow: visible;
+  }
+
   .control-console__workspace {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(420px, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(520px, calc(100svh - 360px)) auto;
     grid-template-areas:
       "terminal summary"
       "actions summary";
     align-items: stretch;
+    height: auto;
+    min-height: calc(100svh - 180px);
+    overflow: visible;
   }
 
   .control-panel--summary-orderable {

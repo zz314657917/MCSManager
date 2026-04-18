@@ -36,6 +36,9 @@ const headerStyle = computed(() => {
 });
 
 const { isPhone } = useScreen();
+const useWideDesktopHeader = computed(
+  () => !isPhone.value && route.meta.desktopChromeMode === "top-nav"
+);
 
 const openPhoneMenu = (b = false) => {
   containerState.showPhoneMenu = b;
@@ -44,7 +47,11 @@ const openPhoneMenu = (b = false) => {
 
 <template>
   <header class="app-header-wrapper" :style="headerStyle">
-    <div v-if="!isPhone" class="app-header-content">
+    <div
+      v-if="!isPhone"
+      class="app-header-content"
+      :class="{ 'app-header-content--wide': useWideDesktopHeader }"
+    >
       <nav class="btns">
         <a href="." style="margin-right: 12px">
           <div class="logo">
@@ -269,6 +276,11 @@ const openPhoneMenu = (b = false) => {
     }
   }
 
+  .app-header-content--wide {
+    max-width: 100%;
+    margin: 0 16px;
+  }
+
   .nav-button {
     margin: 0 4px;
     font-size: 14px;
@@ -313,6 +325,10 @@ const openPhoneMenu = (b = false) => {
     .app-header-content,
     .app-header-content-for-phone {
       margin: 0px 25px;
+    }
+
+    .app-header-content--wide {
+      margin: 0 16px;
     }
   }
 

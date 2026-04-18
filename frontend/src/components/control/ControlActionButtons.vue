@@ -3,14 +3,24 @@ import { t } from "@/lang/i18n";
 import type { ControlTarget } from "@/types/control";
 import { CloseOutlined, PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons-vue";
 
+export type ControlFeatureShortcut = {
+  key: string;
+  title: string;
+  icon: any;
+  click: () => void;
+  disabled?: boolean;
+};
+
 withDefaults(
   defineProps<{
     target: ControlTarget;
     primaryActionLabel: string;
     modeText: string;
+    features?: ControlFeatureShortcut[];
     mobile?: boolean;
   }>(),
   {
+    features: () => [],
     mobile: false
   }
 );
@@ -83,6 +93,24 @@ const emit = defineEmits<{
       </template>
       {{ t("TXT_CODE_1c36c8f2") }}
     </a-button>
+
+    <div
+      v-if="features.length"
+      class="control-action-buttons__feature-grid control-action-buttons__feature-grid--mobile"
+    >
+      <a-button
+        v-for="item in features"
+        :key="item.key"
+        class="control-action-buttons__feature-button"
+        :disabled="item.disabled"
+        @click="item.click"
+      >
+        <template #icon>
+          <component :is="item.icon" />
+        </template>
+        {{ item.title }}
+      </a-button>
+    </div>
   </div>
 
   <section v-else class="control-panel control-panel--actions" data-testid="control-actions-desktop">
@@ -142,6 +170,24 @@ const emit = defineEmits<{
         {{ t("TXT_CODE_1c36c8f2") }}
       </a-button>
     </div>
+
+    <div v-if="features.length" class="control-action-buttons__feature-section">
+      <div class="control-action-buttons__feature-title">{{ t("TXT_CODE_d2bbb2f1") }}</div>
+      <div class="control-action-buttons__feature-grid">
+        <a-button
+          v-for="item in features"
+          :key="item.key"
+          class="control-action-buttons__feature-button"
+          :disabled="item.disabled"
+          @click="item.click"
+        >
+          <template #icon>
+            <component :is="item.icon" />
+          </template>
+          {{ item.title }}
+        </a-button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -177,6 +223,30 @@ const emit = defineEmits<{
   padding: 0 18px;
 }
 
+.control-action-buttons__feature-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px 0;
+}
+
+.control-action-buttons__feature-title {
+  color: var(--color-gray-7);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.control-action-buttons__feature-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.control-action-buttons__feature-button {
+  min-width: 0;
+}
+
 .control-action-buttons__mobile-dock {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -202,5 +272,12 @@ const emit = defineEmits<{
   min-width: 0;
   height: 42px;
   font-size: 13px;
+}
+
+.control-action-buttons__feature-grid--mobile {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 </style>

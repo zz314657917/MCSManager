@@ -1,4 +1,4 @@
-import type { ControlLogLine, ControlTarget } from "@/types/control";
+import type { ControlLogLine, ControlPreviewNode, ControlTarget } from "@/types/control";
 
 export const CONTROL_POLL_INTERVAL_MS = 1000;
 export const CONTROL_OUTPUT_LOG_SIZE = 64 * 1024;
@@ -9,6 +9,20 @@ let controlLogSequence = 0;
 export const createControlTargetKey = (
   target: Pick<ControlTarget, "daemonId" | "mode" | "instanceId">
 ) => `${target.daemonId}:${target.mode}:${target.instanceId}`;
+
+export const collectDaemonIdsToHydrate = (
+  nodes: Array<Pick<ControlPreviewNode, "daemonId" | "daemonAvailable">>,
+  loadedDaemons: Record<string, boolean>,
+  options: {
+    excludeDaemonId?: string;
+    forceRequest?: boolean;
+  } = {}
+) =>
+  nodes
+    .filter((node) => node.daemonAvailable)
+    .map((node) => node.daemonId)
+    .filter((daemonId) => daemonId !== options.excludeDaemonId)
+    .filter((daemonId) => Boolean(options.forceRequest) || !loadedDaemons[daemonId]);
 
 export const formatControlLogTime = (date = new Date()) =>
   date.toLocaleTimeString("zh-CN", {

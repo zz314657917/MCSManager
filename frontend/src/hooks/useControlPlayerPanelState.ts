@@ -333,9 +333,6 @@ export function useControlPlayerPanelState(currentTarget: Readonly<Ref<ControlTa
 
     playerPollTimer = window.setInterval(() => {
       void loadPlayers(false);
-      if (isPlayerModalOpen.value && selectedPlayerUuid.value) {
-        void loadPlayerDetails(false);
-      }
     }, GM_PLAYER_POLL_INTERVAL_MS);
   };
 
