@@ -14,6 +14,7 @@ import { useControlPanelState } from "@/hooks/useControlPanelState";
 import { useControlPlayerPanelPreviewState } from "@/hooks/useControlPlayerPanelPreviewState";
 import { useControlPlayerPanelState } from "@/hooks/useControlPlayerPanelState";
 import { useControlPreviewState } from "@/hooks/useControlPreviewState";
+import { useControlSummaryFocus } from "@/hooks/useControlSummaryFocus";
 import { useControlTargetFavorites } from "@/hooks/useControlTargetFavorites";
 import {
   TYPE_MINECRAFT_JAVA,
@@ -51,6 +52,8 @@ import {
   ControlOutlined,
   DashboardOutlined,
   DesktopOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined,
   FieldTimeOutlined,
   FolderOpenOutlined,
   MenuUnfoldOutlined,
@@ -66,6 +69,7 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const { isPhone } = useScreen();
+const { isSummaryCollapsed, hideSummary, showSummary } = useControlSummaryFocus(isPhone);
 const { state: appState, isAdmin } = useAppStateStore();
 const { openInputDialog } = useAppToolsStore();
 const { refresh: refreshServerConfig, serverConfigFiles } = useServerConfig();
@@ -885,22 +889,43 @@ onUnmounted(() => {
       <div
         v-if="currentTarget"
         class="control-console__workspace"
-        :class="{ 'control-console__workspace--mobile': isPhone }"
+        :class="{
+          'control-console__workspace--mobile': isPhone,
+          'control-console__workspace--summary-collapsed': isSummaryCollapsed
+        }"
       >
         <section
           class="control-panel control-panel--summary control-panel--summary-orderable"
-          :class="{ 'control-panel--summary-mobile': isPhone }"
+          :class="{
+            'control-panel--summary-mobile': isPhone,
+            'control-panel--summary-collapsed': isSummaryCollapsed
+          }"
           data-testid="control-summary-panel"
         >
           <div class="control-panel__header">
             <span>{{ t("TXT_CODE_CONTROL_SUMMARY") }}</span>
-            <div class="control-console__summary-tags">
-              <a-tag :color="getControlTargetStatusColor(currentTarget)">
-                {{ getControlTargetStatusText(currentTarget) }}
-              </a-tag>
-              <a-tag :color="dashboardSourceTagColor">
-                {{ dashboardSourceText }}
-              </a-tag>
+            <div class="control-console__summary-header-actions">
+              <div class="control-console__summary-tags">
+                <a-tag :color="getControlTargetStatusColor(currentTarget)">
+                  {{ getControlTargetStatusText(currentTarget) }}
+                </a-tag>
+                <a-tag :color="dashboardSourceTagColor">
+                  {{ dashboardSourceText }}
+                </a-tag>
+              </div>
+              <a-button
+                v-if="!isPhone"
+                size="small"
+                class="control-console__summary-toggle-button"
+                :title="t('TXT_CODE_CONTROL_HIDE_SUMMARY')"
+                :aria-label="t('TXT_CODE_CONTROL_HIDE_SUMMARY')"
+                @click="hideSummary"
+              >
+                <template #icon>
+                  <EyeInvisibleOutlined />
+                </template>
+                {{ t("TXT_CODE_CONTROL_HIDE_SUMMARY") }}
+              </a-button>
             </div>
           </div>
           <div
@@ -1129,6 +1154,18 @@ onUnmounted(() => {
         <a-empty :description="t('TXT_CODE_CONTROL_NO_NODES')" />
       </section>
     </OperationsPageShell>
+
+    <button
+      v-if="currentTarget && isSummaryCollapsed"
+      type="button"
+      class="control-console__summary-restore-rail"
+      data-testid="control-summary-restore-rail"
+      :title="t('TXT_CODE_CONTROL_SHOW_SUMMARY')"
+      :aria-label="t('TXT_CODE_CONTROL_SHOW_SUMMARY')"
+      @click="showSummary"
+    >
+      <EyeOutlined />
+    </button>
 
     <OperationsMobileNav
       v-if="shellRef?.isPhone && OPERATIONS_MOBILE_NAV_ITEMS.length"
@@ -1484,6 +1521,14 @@ onUnmounted(() => {
     height: auto;
     min-height: calc(100svh - 180px);
     overflow: visible;
+    transition:
+      grid-template-columns 0.24s ease,
+      column-gap 0.24s ease;
+  }
+
+  .control-console__workspace--summary-collapsed {
+    grid-template-columns: minmax(0, 1fr) 0;
+    column-gap: 0;
   }
 
   .control-panel--summary-orderable {
@@ -1492,6 +1537,25 @@ onUnmounted(() => {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    transition:
+      opacity 0.22s ease,
+      transform 0.24s ease,
+      border-color 0.22s ease,
+      box-shadow 0.22s ease;
+    transform-origin: right center;
+  }
+
+  .control-panel--summary-collapsed {
+    width: 0;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transform: translateX(18px);
+    border-color: transparent;
+    border-width: 0;
+    box-shadow: none;
+    padding-bottom: 0;
   }
 
   .control-panel--terminal-orderable {
@@ -1537,6 +1601,18 @@ onUnmounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.control-console__summary-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.control-console__summary-toggle-button {
+  flex-shrink: 0;
 }
 
 .control-console__summary-top {
@@ -2207,5 +2283,42 @@ onUnmounted(() => {
 
 .control-console__metrics-grid--mobile + .control-console__players-section {
   margin-top: 12px;
+}
+
+.control-console__summary-restore-rail {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  z-index: 40;
+  width: 36px;
+  height: 104px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 16px 0 0 16px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.92), rgba(29, 78, 216, 0.96));
+  color: var(--color-always-white);
+  box-shadow:
+    0 12px 28px rgba(37, 99, 235, 0.22),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.control-console__summary-restore-rail:hover {
+  transform: translate(-4px, -50%);
+  box-shadow:
+    0 16px 32px rgba(37, 99, 235, 0.28),
+    0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.control-console__summary-restore-rail:focus-visible {
+  outline: 2px solid rgba(147, 197, 253, 0.95);
+  outline-offset: 2px;
 }
 </style>
