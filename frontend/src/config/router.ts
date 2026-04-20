@@ -1,6 +1,8 @@
 import { $t as t } from "@/lang/i18n";
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import type { LoginUserInfo } from "@/types/user";
+import ControlConsole from "@/views/ControlConsole.vue";
+import GMConsole from "@/views/GMConsole.vue";
 import InstallPage from "@/views/Install.vue";
 import LayoutContainer from "@/views/LayoutContainer.vue";
 import LoginPage from "@/views/Login.vue";
@@ -26,6 +28,9 @@ export interface RouterMetaInfo {
   onlyDisplayEditMode?: boolean;
   customClass?: string[];
   condition?: () => boolean;
+  chromeMode?: "default" | "minimal";
+  desktopChromeMode?: "default" | "top-nav";
+  mobileChromeMode?: "default" | "minimal";
   breadcrumbs?: Array<{
     name: string;
     path: string;
@@ -95,7 +100,7 @@ const originRouterConfig: RouterConfig[] = [
       mainMenu: true,
       redirect: (user) => {
         if (user?.permission === ROLE.ADMIN) {
-          return "/instances";
+          return "/control";
         }
         if (user?.permission && user.permission >= ROLE.USER) {
           return "/customer";
@@ -103,6 +108,50 @@ const originRouterConfig: RouterConfig[] = [
         return "/login";
       },
       permission: ROLE.USER
+    }
+  },
+  {
+    path: "/control",
+    name: t("TXT_CODE_CONTROL_TITLE"),
+    component: ControlConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: true,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav",
+      mobileChromeMode: "default"
+    }
+  },
+  {
+    path: "/gm",
+    name: "GM 管理",
+    component: GMConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
+    }
+  },
+  {
+    path: "/gm/chat",
+    name: "GM 聊天",
+    component: GMConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
+    }
+  },
+  {
+    path: "/players",
+    name: "GM Redirect",
+    redirect: "/gm",
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: false,
+      chromeMode: "minimal"
     }
   },
   {
@@ -300,7 +349,7 @@ const originRouterConfig: RouterConfig[] = [
     name: t("TXT_CODE_2cf59872"),
     component: LayoutContainer,
     meta: {
-      permission: ROLE.ADMIN, // open page without permission
+      permission: ROLE.ADMIN,
       mainMenu: true,
       onlyDisplayEditMode: true,
       customClass: ["nav-button-warning"]

@@ -13,6 +13,36 @@ function handleLoadingError(error: any) {
   setAppLoadingError(errorMessage);
 }
 
+const getHashPath = () => {
+  const rawHash = window.location.hash.replace(/^#/, "");
+  return rawHash.split("?")[0] || "/";
+};
+
+const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/gm/chat", "/players"]);
+
+const isStandalonePreviewEntry = () => STANDALONE_PREVIEW_PATHS.has(getHashPath());
+
+const isBackendUnavailableError = (error: any) => {
+  const message = String(error?.message || error).toLowerCase();
+  return (
+    message.includes("request failed with status code 404") ||
+    message.includes("request failed with status code 500") ||
+    message.includes("network error") ||
+    message.includes("failed to fetch") ||
+    message.includes("econnrefused") ||
+    message.includes("timeout")
+  );
+};
+
+async function initStandalonePreview() {
+  const { state, enableLocalPreviewAccess } = useAppStateStore();
+  enableLocalPreviewAccess();
+  setLoadingTitle("Initializing Local Operations Preview...");
+  await initI18n(state.language);
+  const module = await import("./mount");
+  await module.mountApp();
+}
+
 async function initApp() {
   try {
     const { state, updatePanelStatus } = useAppStateStore();
@@ -27,6 +57,15 @@ async function initApp() {
     setLoadingTitle("Rendering Application...");
     await module.mountApp();
   } catch (error: any) {
+    if (isStandalonePreviewEntry() && isBackendUnavailableError(error)) {
+      try {
+        await initStandalonePreview();
+        return;
+      } catch (previewError: any) {
+        handleLoadingError(previewError);
+        return;
+      }
+    }
     handleLoadingError(error);
   }
 }

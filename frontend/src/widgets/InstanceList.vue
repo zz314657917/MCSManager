@@ -6,6 +6,7 @@ import {
   CloseOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  DesktopOutlined,
   DownOutlined,
   FormOutlined,
   FrownOutlined,
@@ -16,11 +17,12 @@ import {
   SearchOutlined,
   WarningOutlined
 } from "@ant-design/icons-vue";
-import { computed, h, onMounted, ref } from "vue";
+import { computed, h, onMounted, ref, watch } from "vue";
 
 import BetweenMenus from "@/components/BetweenMenus.vue";
 import { router } from "@/config/router";
 import { useInstanceTagSearch, useInstanceTagTips } from "@/hooks/useInstanceTag";
+import { useMonitorOverview } from "@/hooks/useMonitorOverview";
 import { useScreen } from "@/hooks/useScreen";
 import { remoteInstances, remoteNodeList } from "@/services/apis";
 import {
@@ -28,16 +30,20 @@ import {
   batchKill,
   batchRestart,
   batchStart,
-  batchStop
+  batchStop,
+  openInstance,
+  stopInstance
 } from "@/services/apis/instance";
 import { reportErrorMsg } from "@/tools/validator";
-import { INSTANCE_STATUS } from "@/types/const";
+import { INSTANCE_STATUS, INSTANCE_STATUS_CODE } from "@/types/const";
 import { Modal, notification } from "ant-design-vue";
 import { throttle } from "lodash";
+import { useRoute } from "vue-router";
 import type { InstanceMoreDetail } from "../hooks/useInstance";
-import { useInstanceMoreDetail } from "../hooks/useInstance";
+import { useInstanceMoreDetail, verifyEULA } from "../hooks/useInstance";
 import { computeNodeName } from "../tools/nodes";
 import type { NodeStatus } from "../types/index";
+import InstanceWorkspace from "./instance/InstanceWorkspace.vue";
 import Shortcut from "./instance/Shortcut.vue";
 
 defineProps<{
@@ -45,12 +51,26 @@ defineProps<{
 }>();
 
 const { isPhone } = useScreen();
+const route = useRoute();
+const { state: monitorState } = useMonitorOverview();
+const DEFAULT_PAGE_SIZE = 30;
+const INSTANCE_PAGE_SIZE_OPTIONS = ["30", "50"];
 const operationForm = ref({
   instanceName: "",
   currentPage: 1,
-  pageSize: 20,
+  pageSize: DEFAULT_PAGE_SIZE,
   status: ""
 });
+
+const ALL_REMOTE_NODES_ID = "__all__";
+interface InstanceListItem extends InstanceMoreDetail {
+  daemonId?: string;
+  daemonIp?: string;
+  daemonPort?: number;
+  daemonPrefix?: string;
+  daemonRemarks?: string;
+  daemonAvailable?: boolean;
+}
 
 const currentRemoteNode = ref<NodeStatus>();
 
@@ -67,11 +87,17 @@ const {
 } = useInstanceTagSearch();
 
 const isLoading = computed(() => isLoading1.value || isLoading2.value);
+const selectedWorkspaceInstance = ref<InstanceListItem>();
+const sidebarActionLoadingKey = ref("");
 
 const instancesMoreInfo = computed(() => {
-  const newInstances: InstanceMoreDetail[] = [];
+  const newInstances: InstanceListItem[] = [];
   for (const instance of instances.value?.data || []) {
-    const instanceMoreInfo = useInstanceMoreDetail(instance);
+    const instanceItem = instance as InstanceListItem;
+    if (!instanceItem.daemonId && currentRemoteNode.value?.uuid) {
+      instanceItem.daemonId = currentRemoteNode.value.uuid;
+    }
+    const instanceMoreInfo = useInstanceMoreDetail(instanceItem);
     newInstances.push(instanceMoreInfo);
   }
   return newInstances || [];
@@ -83,14 +109,7 @@ const initNodes = async () => {
   if (nodes.value?.length === 0) {
     return reportErrorMsg(t("TXT_CODE_e3d96a26"));
   }
-  if (localStorage.getItem("pageSelectedRemote")) {
-    currentRemoteNode.value = JSON.parse(localStorage.pageSelectedRemote);
-    if (!nodes.value?.some((item) => item.uuid === currentRemoteNode.value?.uuid)) {
-      currentRemoteNode.value = undefined;
-    }
-  } else {
-    currentRemoteNode.value = nodes.value?.[0];
-  }
+  currentRemoteNode.value = undefined;
 };
 
 const initInstancesData = async (resetPage?: boolean) => {
@@ -102,7 +121,7 @@ const initInstancesData = async (resetPage?: boolean) => {
     }
     await getInstances({
       params: {
-        daemonId: currentRemoteNode.value?.uuid ?? "",
+        daemonId: currentRemoteNode.value?.uuid ?? ALL_REMOTE_NODES_ID,
         page: operationForm.value.currentPage,
         page_size: operationForm.value.pageSize,
         status: operationForm.value.status,
@@ -111,9 +130,16 @@ const initInstancesData = async (resetPage?: boolean) => {
       }
     });
     updateTagTips(instances.value?.allTags || []);
+    syncWorkspaceSelection();
   } catch (err) {
     return reportErrorMsg(t("TXT_CODE_e109c091"));
   }
+};
+
+const handlePaginationChange = async (page: number, pageSize?: number) => {
+  operationForm.value.currentPage = page;
+  operationForm.value.pageSize = pageSize || operationForm.value.pageSize;
+  await initInstancesData();
 };
 
 const handleQueryInstance = throttle(async () => {
@@ -131,12 +157,190 @@ const toAppDetailPage = (daemonId: string, instanceId: string) => {
   });
 };
 
+const getInstanceDaemonId = (item: InstanceListItem) => {
+  return item.daemonId || currentRemoteNode.value?.uuid || "";
+};
+
+const isSameInstance = (a?: InstanceListItem, b?: InstanceListItem) => {
+  if (!a || !b) return false;
+  return a.instanceUuid === b.instanceUuid && getInstanceDaemonId(a) === getInstanceDaemonId(b);
+};
+
+const findWorkspaceInstance = (daemonId?: string, instanceId?: string) => {
+  if (!daemonId || !instanceId) return undefined;
+  return instancesMoreInfo.value.find(
+    (item) => item.instanceUuid === instanceId && getInstanceDaemonId(item) === daemonId
+  );
+};
+
+const selectWorkspaceInstance = (item?: InstanceListItem, syncRoute = true) => {
+  selectedWorkspaceInstance.value = item;
+  if (!item || !syncRoute || isPhone.value) return;
+
+  const daemonId = getInstanceDaemonId(item);
+  if (!daemonId) return;
+  if (route.query.daemonId === daemonId && route.query.instanceId === item.instanceUuid) return;
+
+  router.replace({
+    query: {
+      ...route.query,
+      daemonId,
+      instanceId: item.instanceUuid
+    }
+  });
+};
+
+const syncWorkspaceSelection = (preferRoute = false) => {
+  if (isPhone.value) return;
+  const list = instancesMoreInfo.value;
+  if (!list.length) return selectWorkspaceInstance(undefined, false);
+
+  const routeDaemonId = route.query.daemonId ? String(route.query.daemonId) : "";
+  const routeInstanceId = route.query.instanceId ? String(route.query.instanceId) : "";
+  const routeMatched = findWorkspaceInstance(routeDaemonId, routeInstanceId);
+  const currentMatched = list.find((item) => isSameInstance(item, selectedWorkspaceInstance.value));
+  const next = (preferRoute && routeMatched) || currentMatched || routeMatched || list[0];
+  selectWorkspaceInstance(next as InstanceListItem);
+};
+
+const isWorkspaceSelected = (item: InstanceListItem) => {
+  return isSameInstance(item, selectedWorkspaceInstance.value);
+};
+
+const getInstanceStatusColor = (item: InstanceListItem) => {
+  if (item.status === INSTANCE_STATUS_CODE.RUNNING) return "green";
+  if (item.status === INSTANCE_STATUS_CODE.STARTING || item.status === INSTANCE_STATUS_CODE.BUSY)
+    return "pink";
+  return "";
+};
+
+const getMonitorSnapshot = (item: InstanceListItem) => {
+  const daemonId = getInstanceDaemonId(item);
+  return monitorState.value?.servers.find(
+    (server) => server.daemonId === daemonId && server.serverId === item.instanceUuid
+  );
+};
+
+const getInstancePlayersText = (item: InstanceListItem) => {
+  const monitor = getMonitorSnapshot(item);
+  if (monitor?.plugin?.online) {
+    return `${monitor.plugin.onlinePlayers} / ${monitor.plugin.maxPlayers}`;
+  }
+  if (item.info?.mcPingOnline) {
+    return `${item.info.currentPlayers} / ${item.info.maxPlayers}`;
+  }
+  return "--";
+};
+
+const getInstanceTpsText = (item: InstanceListItem) => {
+  const tps = getMonitorSnapshot(item)?.plugin?.tps?.oneMin;
+  return tps != null ? tps.toFixed(2) : "--";
+};
+
+const isInstanceRunning = (item: InstanceListItem) => {
+  return item.status === INSTANCE_STATUS_CODE.RUNNING;
+};
+
+const isInstanceStopped = (item: InstanceListItem) => {
+  return item.status === INSTANCE_STATUS_CODE.STOPPED;
+};
+
+const getSidebarActionKey = (item: InstanceListItem) => {
+  return `${getInstanceDaemonId(item)}:${item.instanceUuid}`;
+};
+
+const getInstanceNodeColorIndex = (item: InstanceListItem) => {
+  const daemonId = getInstanceDaemonId(item);
+  const source = daemonId || item.daemonIp || "";
+  let hash = 0;
+  for (let index = 0; index < source.length; index++) {
+    hash = (hash + source.charCodeAt(index) * (index + 1)) % 6;
+  }
+  return hash;
+};
+
+const isSidebarActionLoading = (item: InstanceListItem) => {
+  return sidebarActionLoadingKey.value === getSidebarActionKey(item);
+};
+
+const runSidebarPowerAction = async (event: Event | undefined, item: InstanceListItem) => {
+  event?.stopPropagation();
+  const daemonId = getInstanceDaemonId(item);
+  if (!daemonId) return reportErrorMsg(t("TXT_CODE_e109c091"));
+  const actionKey = getSidebarActionKey(item);
+  sidebarActionLoadingKey.value = actionKey;
+  try {
+    if (isInstanceStopped(item)) {
+      if (item.config?.type?.startsWith("minecraft/java")) {
+        const flag = await verifyEULA(item.instanceUuid, daemonId);
+        if (!flag) return;
+      }
+      await openInstance().execute({
+        params: {
+          uuid: item.instanceUuid,
+          daemonId
+        }
+      });
+      notification.success({
+        message: t("TXT_CODE_2b5fd76e"),
+        description: item.config.nickname
+      });
+    } else if (isInstanceRunning(item)) {
+      await stopInstance().execute({
+        params: {
+          uuid: item.instanceUuid,
+          daemonId
+        }
+      });
+      notification.success({
+        message: t("TXT_CODE_4822a21"),
+        description: item.config.nickname
+      });
+    }
+    await initInstancesData();
+  } catch (err: any) {
+    console.error(err);
+    reportErrorMsg(err.message || err);
+  } finally {
+    if (sidebarActionLoadingKey.value === actionKey) {
+      sidebarActionLoadingKey.value = "";
+    }
+  }
+};
+
+const handleSidebarInstanceClick = (item: InstanceListItem) => {
+  if (multipleMode.value) {
+    selectInstance(item);
+    return;
+  }
+  selectWorkspaceInstance(item);
+};
+
+const getCurrentNodeName = () => {
+  if (!currentRemoteNode.value) return t("TXT_CODE_4bedec2a");
+  return computeNodeName(
+    currentRemoteNode.value.ip || "",
+    currentRemoteNode.value.available || true,
+    currentRemoteNode.value.remarks
+  );
+};
+
+const handleChangeAllNodes = async () => {
+  try {
+    currentRemoteNode.value = undefined;
+    selectedInstance.value = [];
+    localStorage.removeItem("pageSelectedRemote");
+    await initInstancesData(true);
+  } catch (err: any) {
+    console.error(err.message);
+  }
+};
+
 const handleChangeNode = async (item: NodeStatus) => {
   try {
     currentRemoteNode.value = item;
     selectedInstance.value = [];
     await initInstancesData(true);
-    localStorage.setItem("pageSelectedRemote", JSON.stringify(item));
   } catch (err: any) {
     console.error(err.message);
   }
@@ -160,6 +364,12 @@ const toMarketPage = () => {
   });
 };
 
+const toControlPage = () => {
+  router.push({
+    path: "/control"
+  });
+};
+
 const toNodesPage = () => {
   router.push({
     path: "/node"
@@ -167,15 +377,18 @@ const toNodesPage = () => {
 };
 
 const multipleMode = ref(false);
-const selectedInstance = ref<InstanceMoreDetail[]>([]);
+const selectedInstance = ref<InstanceListItem[]>([]);
 
-const findInstance = (item: InstanceMoreDetail) => {
-  return selectedInstance.value.find((i) => i.instanceUuid === item.instanceUuid);
+const findInstance = (item: InstanceListItem) => {
+  return selectedInstance.value.find(
+    (i) => i.instanceUuid === item.instanceUuid && getInstanceDaemonId(i) === getInstanceDaemonId(item)
+  );
 };
 
-const selectInstance = (item: InstanceMoreDetail) => {
-  if (findInstance(item)) {
-    selectedInstance.value.splice(selectedInstance.value.indexOf(item), 1);
+const selectInstance = (item: InstanceListItem) => {
+  const selected = findInstance(item);
+  if (selected) {
+    selectedInstance.value.splice(selectedInstance.value.indexOf(selected), 1);
   } else {
     selectedInstance.value.push(item);
   }
@@ -183,9 +396,9 @@ const selectInstance = (item: InstanceMoreDetail) => {
 
 const handleSelectInstance = (item: InstanceMoreDetail) => {
   if (multipleMode.value) {
-    selectInstance(item);
+    selectInstance(item as InstanceListItem);
   } else {
-    toAppDetailPage(currentRemoteNode.value?.uuid || "", item.instanceUuid);
+    toAppDetailPage(getInstanceDaemonId(item as InstanceListItem), item.instanceUuid);
   }
 };
 
@@ -251,10 +464,13 @@ const batchOperation = async (actName: "start" | "stop" | "kill" | "restart") =>
 
   const exec = async (fn: Function, msg: string) => {
     try {
+      if (selectedInstance.value.some((item) => !getInstanceDaemonId(item))) {
+        return reportErrorMsg(t("TXT_CODE_e109c091"));
+      }
       const state = await fn({
         data: selectedInstance.value.map((item) => ({
           instanceUuid: item.instanceUuid,
-          daemonId: currentRemoteNode.value?.uuid ?? ""
+          daemonId: getInstanceDaemonId(item)
         }))
       });
       if (state.value) {
@@ -277,10 +493,13 @@ const batchOperation = async (actName: "start" | "stop" | "kill" | "restart") =>
 const batchDeleteInstance = async (deleteFile: boolean) => {
   if (selectedInstance.value.length === 0) return reportErrorMsg(t("TXT_CODE_a0a77be5"));
   const { execute, state } = batchDelete();
-  const uuids: string[] = [];
+  const groupedUuids = new Map<string, string[]>();
   const paths: string[] = [];
   for (const i of selectedInstance.value) {
-    uuids.push(i.instanceUuid);
+    const daemonId = getInstanceDaemonId(i);
+    if (!daemonId) return reportErrorMsg(t("TXT_CODE_e109c091"));
+    if (!groupedUuids.has(daemonId)) groupedUuids.set(daemonId, []);
+    groupedUuids.get(daemonId)?.push(i.instanceUuid);
     if (i.config?.cwd) {
       paths.push(i.config.cwd);
     }
@@ -302,15 +521,17 @@ const batchDeleteInstance = async (deleteFile: boolean) => {
     okText: t("TXT_CODE_d507abff"),
     async onOk() {
       try {
-        await execute({
-          params: {
-            daemonId: currentRemoteNode.value?.uuid ?? ""
-          },
-          data: {
-            uuids: uuids,
-            deleteFile: deleteFile
-          }
-        });
+        for (const [daemonId, uuids] of groupedUuids.entries()) {
+          await execute({
+            params: {
+              daemonId
+            },
+            data: {
+              uuids,
+              deleteFile
+            }
+          });
+        }
         if (state.value) {
           confirmDeleteInstanceModal.destroy();
           exitMultipleMode();
@@ -328,6 +549,15 @@ const batchDeleteInstance = async (deleteFile: boolean) => {
     onCancel() {}
   });
 };
+
+watch(
+  () => [route.query.daemonId, route.query.instanceId],
+  () => syncWorkspaceSelection(true)
+);
+
+watch(isPhone, () => {
+  syncWorkspaceSelection(true);
+});
 
 onMounted(async () => {
   await initInstancesData();
@@ -347,9 +577,14 @@ onMounted(async () => {
             </a-typography-title>
           </template>
           <template #right>
-            <a-dropdown>
+            <a-dropdown v-if="isPhone">
               <template #overlay>
                 <a-menu>
+                  <a-menu-item :key="ALL_REMOTE_NODES_ID" @click="handleChangeAllNodes">
+                    <DatabaseOutlined />
+                    {{ t("TXT_CODE_4bedec2a") }}
+                  </a-menu-item>
+                  <a-menu-divider />
                   <a-menu-item
                     v-for="item in nodes"
                     :key="item.uuid"
@@ -371,17 +606,15 @@ onMounted(async () => {
                 <a-typography-text
                   style="max-width: 145px"
                   :ellipsis="{ ellipsis: true }"
-                  :content="
-                    computeNodeName(
-                      currentRemoteNode?.ip || '',
-                      currentRemoteNode?.available || true,
-                      currentRemoteNode?.remarks
-                    )
-                  "
+                  :content="getCurrentNodeName()"
                 />
                 <DownOutlined />
               </a-button>
             </a-dropdown>
+            <a-button class="mr-10" @click="toControlPage">
+              <DesktopOutlined />
+              {{ t("TXT_CODE_CONTROL_TITLE") }}
+            </a-button>
             <a-button
               type="primary"
               :disabled="!currentRemoteNode?.available"
@@ -474,9 +707,10 @@ onMounted(async () => {
             <a-pagination
               v-model:current="operationForm.currentPage"
               v-model:pageSize="operationForm.pageSize"
+              :page-size-options="INSTANCE_PAGE_SIZE_OPTIONS"
               :total="(instances?.maxPage || 0) * operationForm.pageSize"
               show-size-changer
-              @change="initInstancesData()"
+              @change="handlePaginationChange"
             />
           </template>
         </BetweenMenus>
@@ -502,8 +736,118 @@ onMounted(async () => {
           </a-tag>
         </div>
       </a-col>
-      <a-col v-if="isLoading" :span="24">
+      <a-col v-if="isLoading && (isPhone || instancesMoreInfo.length === 0)" :span="24">
         <Loading></Loading>
+      </a-col>
+
+      <a-col v-else-if="instancesMoreInfo.length > 0 && !isPhone" :span="24">
+        <div class="instance-workbench">
+          <aside class="instance-workbench__sidebar">
+            <div class="instance-workbench__node-switcher">
+              <a-dropdown>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item :key="ALL_REMOTE_NODES_ID" @click="handleChangeAllNodes">
+                      <DatabaseOutlined />
+                      {{ t("TXT_CODE_4bedec2a") }}
+                    </a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item
+                      v-for="item in nodes"
+                      :key="item.uuid"
+                      :disabled="!item.available"
+                      @click="handleChangeNode(item)"
+                    >
+                      <DatabaseOutlined v-if="item.available" />
+                      <FrownOutlined v-else />
+                      {{ computeNodeName(item.ip, item.available, item.remarks) }}
+                    </a-menu-item>
+                    <a-menu-divider />
+                    <a-menu-item key="toNodesPage" @click="toNodesPage()">
+                      <FormOutlined />
+                      {{ t("TXT_CODE_28e53fed") }}
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+                <a-button class="instance-workbench__node-button">
+                  <a-typography-text
+                    class="instance-workbench__node-text"
+                    :ellipsis="{ ellipsis: true }"
+                    :content="getCurrentNodeName()"
+                  />
+                  <DownOutlined />
+                </a-button>
+              </a-dropdown>
+            </div>
+            <div class="instance-workbench__sidebar-title">
+              <span>实例列表</span>
+              <a-tag>{{ instancesMoreInfo.length }}</a-tag>
+            </div>
+            <div class="instance-workbench__list">
+              <button
+                v-for="item in instancesMoreInfo"
+                :key="`${getInstanceDaemonId(item)}:${item.instanceUuid}`"
+                type="button"
+                class="instance-workbench__list-item"
+                :class="{
+                  [`node-color-${getInstanceNodeColorIndex(item)}`]: true,
+                  active: !multipleMode && isWorkspaceSelected(item),
+                  selected: multipleMode && findInstance(item)
+                }"
+                @click="handleSidebarInstanceClick(item)"
+              >
+                <div class="instance-workbench__item-main">
+                  <div class="instance-workbench__item-copy">
+                    <div class="instance-workbench__item-name">{{ item.config.nickname }}</div>
+                    <div class="instance-workbench__item-metrics">
+                      人数 {{ getInstancePlayersText(item) }} · TPS {{ getInstanceTpsText(item) }}
+                    </div>
+                  </div>
+                  <div class="instance-workbench__item-actions">
+                    <a-tag class="m-0" :color="getInstanceStatusColor(item)">
+                      {{ item.moreInfo?.statusText || INSTANCE_STATUS[item.status] || "--" }}
+                    </a-tag>
+                    <a-button
+                      v-if="isInstanceStopped(item)"
+                      size="small"
+                      type="primary"
+                      ghost
+                      :loading="isSidebarActionLoading(item)"
+                      @click.stop="runSidebarPowerAction($event, item)"
+                    >
+                      启动
+                    </a-button>
+                    <a-popconfirm
+                      v-else-if="isInstanceRunning(item)"
+                      :title="t('TXT_CODE_276756b2')"
+                      @confirm="runSidebarPowerAction(undefined, item)"
+                    >
+                      <a-button
+                        size="small"
+                        danger
+                        :loading="isSidebarActionLoading(item)"
+                        @click.stop
+                      >
+                        关闭
+                      </a-button>
+                    </a-popconfirm>
+                    <a-button v-else size="small" disabled>处理中</a-button>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </aside>
+
+          <main class="instance-workbench__main">
+            <InstanceWorkspace
+              v-if="selectedWorkspaceInstance"
+              :card="card"
+              :target-instance-info="selectedWorkspaceInstance"
+              :target-daemon-id="getInstanceDaemonId(selectedWorkspaceInstance)"
+              @refresh-list="initInstancesData()"
+            />
+          </main>
+        </div>
       </a-col>
 
       <a-col v-else-if="instancesMoreInfo.length > 0" :span="24">
@@ -511,7 +855,7 @@ onMounted(async () => {
           <fade-up-animation>
             <a-col
               v-for="item in instancesMoreInfo"
-              :key="item.instanceUuid"
+              :key="`${getInstanceDaemonId(item)}:${item.instanceUuid}`"
               :span="24"
               :xl="6"
               :lg="8"
@@ -523,7 +867,7 @@ onMounted(async () => {
                 style="height: 100%"
                 :card="card"
                 :target-instance-info="item"
-                :target-daemon-id="currentRemoteNode?.uuid"
+                :target-daemon-id="getInstanceDaemonId(item)"
                 @click="handleSelectInstance(item)"
                 @refresh-list="initInstancesData()"
               />
@@ -552,6 +896,167 @@ onMounted(async () => {
 </template>
 
 <style lang="scss" scoped>
+.instance-workbench {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 18px;
+  align-items: flex-start;
+  min-height: 620px;
+}
+
+.instance-workbench__sidebar,
+.instance-workbench__main {
+  border: 1px solid var(--card-border-color);
+  border-radius: 16px;
+  background: rgba(250, 252, 255, 0.86);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.instance-workbench__sidebar {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 160px);
+  min-height: 620px;
+  overflow: hidden;
+}
+
+.instance-workbench__node-switcher {
+  padding: 12px 12px 0;
+}
+
+.instance-workbench__node-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  overflow: hidden;
+}
+
+.instance-workbench__node-text {
+  max-width: 250px;
+}
+
+.instance-workbench__sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border-color);
+  font-weight: 700;
+}
+
+.instance-workbench__list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.instance-workbench__list-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-left: 5px solid var(--node-accent, var(--color-gray-6));
+  border-radius: 13px;
+  padding: 12px;
+  background: linear-gradient(90deg, var(--node-bg, var(--color-gray-1)), var(--color-gray-1) 72%);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--color-gray-6);
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    border-color: var(--color-primary);
+    border-left-color: var(--node-accent, var(--color-primary));
+    background: rgba(64, 150, 255, 0.08);
+  }
+
+  &.selected {
+    border-color: var(--color-green-3);
+    border-left-color: var(--node-accent, var(--color-green-3));
+    background: var(--color-green-1);
+  }
+
+  &.node-color-0 {
+    --node-accent: #3b82f6;
+    --node-bg: rgba(59, 130, 246, 0.12);
+  }
+
+  &.node-color-1 {
+    --node-accent: #16a34a;
+    --node-bg: rgba(22, 163, 74, 0.12);
+  }
+
+  &.node-color-2 {
+    --node-accent: #f59e0b;
+    --node-bg: rgba(245, 158, 11, 0.14);
+  }
+
+  &.node-color-3 {
+    --node-accent: #06b6d4;
+    --node-bg: rgba(6, 182, 212, 0.12);
+  }
+
+  &.node-color-4 {
+    --node-accent: #ef4444;
+    --node-bg: rgba(239, 68, 68, 0.11);
+  }
+
+  &.node-color-5 {
+    --node-accent: #8b5cf6;
+    --node-bg: rgba(139, 92, 246, 0.11);
+  }
+}
+
+.instance-workbench__item-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.instance-workbench__item-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.instance-workbench__item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.instance-workbench__item-metrics {
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-gray-7);
+  font-size: 12px;
+}
+
+.instance-workbench__item-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.instance-workbench__main {
+  min-width: 0;
+  padding: 18px;
+}
+
 .search-input {
   transition: all 0.6s;
   text-align: center;

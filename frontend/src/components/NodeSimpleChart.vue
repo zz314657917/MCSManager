@@ -4,6 +4,7 @@ import { getRandomId } from "@/tools/randId";
 import { Flex } from "ant-design-vue";
 import { onMounted, watch } from "vue";
 import { useSimpleChart } from "../hooks/useOverviewChart";
+import { useScreen } from "@/hooks/useScreen";
 
 const props = defineProps<{
   cpuData: number[];
@@ -12,6 +13,7 @@ const props = defineProps<{
   memUsage: string;
 }>();
 
+const { isPhone } = useScreen();
 const chartCpuDomId = `${getRandomId()}-cpu-chart`;
 const chartMemDomId = `${getRandomId()}-mem-chart`;
 
@@ -56,14 +58,14 @@ watch(props, () => {
 <template>
   <div class="node-simple-chart" style="width: 100%">
     <a-row :gutter="[24, 24]">
-      <a-col :span="12">
+      <a-col :span="isPhone ? 24 : 12">
         <Flex justify="space-between" align="center">
           <span class="usage-title">{{ t("TXT_CODE_eca8f1b3") }}</span>
           <span class="usage-info">{{ cpuUsage }}</span>
         </Flex>
         <div :id="chartCpuDomId" class="node-chart-container"></div>
       </a-col>
-      <a-col :span="12">
+      <a-col :span="isPhone ? 24 : 12">
         <Flex justify="space-between" align="center">
           <span class="usage-title">{{ t("TXT_CODE_6ca6667f") }}</span>
           <span class="usage-info">{{ memUsage }}</span>
@@ -89,6 +91,14 @@ watch(props, () => {
     opacity: 0.9;
     font-size: 12px;
     color: var(--color-gray-7);
+  }
+}
+
+@media (max-width: 640px) {
+  .node-simple-chart {
+    .node-chart-container {
+      height: 100px;
+    }
   }
 }
 </style>

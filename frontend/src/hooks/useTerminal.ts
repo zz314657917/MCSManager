@@ -67,6 +67,7 @@ export function useTerminal() {
   const isConnect = ref<boolean>(false);
   const socketAddress = ref("");
   let isManualDisconnect = false;
+  let activeConfig: UseTerminalParams | undefined;
 
   const isGlobalTerminal = computed(() => {
     return state.value?.config.nickname === GLOBAL_INSTANCE_NAME;
@@ -76,7 +77,7 @@ export function useTerminal() {
     return state.value?.config.processType === "docker";
   });
 
-  let fitAddonTask: NodeJS.Timer;
+  let fitAddonTask: NodeJS.Timer | undefined;
   let cachedSize = {
     w: 160,
     h: 40
@@ -87,8 +88,15 @@ export function useTerminal() {
     isManualDisconnect = false;
 
     if (socket) {
-      return socket;
+      if (
+        activeConfig?.instanceId === config.instanceId &&
+        activeConfig?.daemonId === config.daemonId
+      ) {
+        return socket;
+      }
+      resetTerminalSession();
     }
+    activeConfig = config;
 
     const res = await setUpTerminalStreamChannel().execute({
       params: {
@@ -337,6 +345,32 @@ export function useTerminal() {
     return term;
   };
 
+  const disposeTerminalWindow = () => {
+    if (fitAddonTask) clearInterval(fitAddonTask);
+    fitAddonTask = undefined;
+    terminal.value?.dispose();
+    terminal.value = undefined;
+  };
+
+  const disconnectSocket = () => {
+    if (!socket) return;
+    isManualDisconnect = true;
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = undefined;
+    isManualDisconnect = false;
+  };
+
+  const resetTerminalSession = () => {
+    disposeTerminalWindow();
+    disconnectSocket();
+    state.value = undefined;
+    isReady.value = false;
+    isConnect.value = false;
+    socketAddress.value = "";
+    activeConfig = undefined;
+  };
+
   const clearTerminal = () => {
     terminal.value?.clear();
   };
@@ -367,12 +401,9 @@ export function useTerminal() {
   });
 
   onUnmounted(() => {
-    clearInterval(fitAddonTask);
+    resetTerminalSession();
     clearInterval(statusQueryTask);
     events.removeAllListeners();
-    isManualDisconnect = true;
-    socket?.disconnect();
-    socket?.removeAllListeners();
   });
 
   const isStopped = computed(() => state?.value?.status === INSTANCE_STATUS_CODE.STOPPED);
@@ -392,6 +423,8 @@ export function useTerminal() {
     isDockerMode,
     execute,
     initTerminalWindow,
+    disposeTerminalWindow,
+    resetTerminalSession,
     sendCommand,
     clearTerminal
   };

@@ -5,6 +5,7 @@ import {
   AppstoreOutlined,
   AreaChartOutlined,
   CloseOutlined,
+  DesktopOutlined,
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
@@ -23,6 +24,7 @@ const { menus, handleToPage } = useHeaderMenus();
 const isExpanded = ref(false);
 
 const routePathIcons: Record<string, Component> = {
+  "/control": DesktopOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
   "/overview": AreaChartOutlined,

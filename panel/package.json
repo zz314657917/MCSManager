@@ -5,7 +5,8 @@
   "description": "Provide MCSManager with the ability to connect and control all Daemons, and provide API services for the front end.",
   "scripts": {
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && node --enable-source-maps production/app.js\"",
-    "build": "webpack --config webpack.config.js"
+    "build": "webpack --config webpack.config.js",
+    "test:monitor-overview": "ts-node --files src/app/service/monitor_overview.test.ts"
   },
   "homepage": "https://mcsmanager.com/",
   "author": "https://github.com/yumao233",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@koa/router": "^10.0.0",
     "@types/qrcode": "^1.5.5",
+    "async-mutex": "^0.5.0",
     "axios": "^1.8.2",
     "bcryptjs": "^2.4.3",
     "crypto": "^1.0.1",

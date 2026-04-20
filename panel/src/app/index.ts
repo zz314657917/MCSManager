@@ -7,8 +7,10 @@ import "./service/user_statistics";
 import "./service/visual_data";
 
 import serviceRouter from "./routers/daemon_router";
+import alertRouter from "./routers/alert_router";
 import environmentRouter from "./routers/environment_router";
 import filemanager_router from "./routers/filemananger_router";
+import gmRouter from "./routers/gm_router";
 import lowUserRouter from "./routers/general_user_router";
 import instanceRouter from "./routers/instance_admin_router";
 import exchangeRouter from "./routers/instance_exchange_router";
@@ -17,6 +19,7 @@ import javaManagerRouter from "./routers/java_manager_router";
 import loginRouter from "./routers/login_router";
 import businessUserRouter from "./routers/manage_user_router";
 import modManagerRouter from "./routers/mod_manager_router";
+import monitorRouter from "./routers/monitor_router";
 import overviewRouter from "./routers/overview_router";
 import scheduleRouter from "./routers/schedule_router";
 import settingsRouter from "./routers/settings_router";
@@ -39,8 +42,11 @@ export function mountRouters(app: Koa<Koa.DefaultState, Koa.DefaultContext>) {
   apiRouter.use(ssoRouter.routes()).use(ssoRouter.allowedMethods());
   apiRouter.use(environmentRouter.routes()).use(environmentRouter.allowedMethods());
   apiRouter.use(exchangeRouter.routes()).use(exchangeRouter.allowedMethods());
+  apiRouter.use(gmRouter.routes()).use(gmRouter.allowedMethods());
   apiRouter.use(javaManagerRouter.routes()).use(javaManagerRouter.allowedMethods());
   apiRouter.use(modManagerRouter.routes()).use(modManagerRouter.allowedMethods());
+  apiRouter.use(monitorRouter.routes()).use(monitorRouter.allowedMethods());
+  apiRouter.use(alertRouter.routes()).use(alertRouter.allowedMethods());
 
   app.use(apiRouter.routes()).use(apiRouter.allowedMethods());
 }
