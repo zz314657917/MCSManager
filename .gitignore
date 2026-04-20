@@ -125,3 +125,4 @@ src/public/1.png
 */.idea/*
 
 .turbo
+mcsm-monitor-plugin/target/
