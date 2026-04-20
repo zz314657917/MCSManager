@@ -2,7 +2,7 @@
 title: Knowledge Base
 type: index
 repo: MCSManager-monitor
-last_verified: 2026-04-15
+last_verified: 2026-04-20
 ---
 
 # 说明
@@ -11,6 +11,7 @@ last_verified: 2026-04-15
 # 使用方式
 - 新会话优先阅读 `knowledge/00-start-here.md`
 - 有监控链路问题时，再读 `knowledge/04-monitor-architecture.md`
+- 有 control、GM、operations 或独立预览问题时，优先读 `knowledge/frontend/control-console.md`、`knowledge/frontend/standalone-preview.md` 和相关 `errors/`
 - 模块问题优先查对应目录
 - 问题解决后，把稳定结论回写到知识库
 
@@ -27,3 +28,11 @@ last_verified: 2026-04-15
 - `errors/`：错误与排查记录
 - `decisions/`：决策记录
 - `tasks/`：当前任务状态
+
+# 当前更常用的入口
+- 监控链路：`knowledge/04-monitor-architecture.md`
+- control / GM 页面：`knowledge/frontend/control-console.md`
+- standalone preview：`knowledge/frontend/standalone-preview.md`
+- 浏览器直连 daemon / mixed content：`knowledge/errors/browser-daemon-direct-connect.md`、`knowledge/errors/mixed-content-wss.md`
+- control 节点列表加载失败：`knowledge/errors/control-node-list-load-failure.md`
+- 当前进行中的工作：`knowledge/tasks/current-task.md`

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import OperationsMobileNav from "@/components/operations/OperationsMobileNav.vue";
 import type { OperationsMobileNavItem } from "@/components/operations/mobileNav";
 import { useScreen } from "@/hooks/useScreen";
 import { ArrowLeftOutlined } from "@ant-design/icons-vue";
@@ -17,6 +16,8 @@ const props = withDefaults(
     mobileBodyPaddingBottom?: string;
     mobileNavItems?: OperationsMobileNavItem[];
     hideDesktopHeader?: boolean;
+    hideMobileHeader?: boolean;
+    hideEyebrowOnMobile?: boolean;
   }>(),
   {
     eyebrow: "",
@@ -26,7 +27,9 @@ const props = withDefaults(
     showSidebarOnMobile: true,
     mobileBodyPaddingBottom: "12px",
     mobileNavItems: () => [],
-    hideDesktopHeader: false
+    hideDesktopHeader: false,
+    hideMobileHeader: false,
+    hideEyebrowOnMobile: false
   }
 );
 
@@ -56,6 +59,8 @@ const goBack = () => {
 
   router.push(props.fallbackBackTo);
 };
+
+defineExpose({ isPhone });
 </script>
 
 <template>
@@ -64,7 +69,7 @@ const goBack = () => {
     :class="{ 'ops-page-shell--desktop-embedded': hideDesktopHeader && !isPhone }"
   >
     <header
-      v-if="!hideDesktopHeader || isPhone"
+      v-if="(!hideDesktopHeader || isPhone) && !(isPhone && hideMobileHeader)"
       class="ops-page-shell__header"
       :class="{ 'ops-page-shell__header--mobile': isPhone }"
     >
@@ -77,7 +82,7 @@ const goBack = () => {
         </a-button>
 
         <div class="ops-page-shell__title-wrap">
-          <div v-if="eyebrow" class="ops-page-shell__eyebrow">{{ eyebrow }}</div>
+          <div v-if="eyebrow && !(isPhone && hideEyebrowOnMobile)" class="ops-page-shell__eyebrow">{{ eyebrow }}</div>
           <h1 class="ops-page-shell__title">{{ title }}</h1>
         </div>
       </div>
@@ -86,6 +91,10 @@ const goBack = () => {
         <slot name="header-actions" :is-phone="isPhone" />
       </div>
     </header>
+
+    <section v-if="isPhone && hideMobileHeader">
+      <slot name="mobile-actions" />
+    </section>
 
     <section v-if="isPhone">
       <slot name="mobile-prelude" />
@@ -114,11 +123,6 @@ const goBack = () => {
         <slot />
       </main>
     </div>
-
-    <OperationsMobileNav
-      v-if="isPhone && mobileNavItems.length"
-      :items="mobileNavItems"
-    />
   </div>
 </template>
 

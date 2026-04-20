@@ -43,6 +43,82 @@ export const createControlLogLine = (
 export const trimControlLogLines = (lines: ControlLogLine[], max = CONTROL_MAX_LOG_LINES) =>
   lines.length > max ? lines.slice(-max) : lines;
 
+const getControlRequestErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  return String(error ?? "");
+};
+
+export const isRetriableControlRequestError = (error: unknown) => {
+  const message = getControlRequestErrorMessage(error).trim().toLowerCase();
+  if (!message) return false;
+
+  return (
+    message.includes("network error") ||
+    message.includes("failed to fetch") ||
+    message.includes("econnrefused") ||
+    message.includes("timeout") ||
+    message.includes("status code 500") ||
+    message.includes("status code 502") ||
+    message.includes("status code 503") ||
+    message.includes("status code 504")
+  );
+};
+
+export const resolveControlRequestErrorText = (
+  error: unknown,
+  fallbackText: string,
+  options: {
+    forbiddenText?: string;
+    serverErrorText?: string;
+    networkErrorText?: string;
+  } = {}
+) => {
+  const message = getControlRequestErrorMessage(error).trim();
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes("403")) return options.forbiddenText || fallbackText;
+  if (lowerMessage.includes("500")) return options.serverErrorText || fallbackText;
+
+  if (
+    lowerMessage.includes("network error") ||
+    lowerMessage.includes("failed to fetch") ||
+    lowerMessage.includes("econnrefused") ||
+    lowerMessage.includes("timeout")
+  ) {
+    return options.networkErrorText || fallbackText;
+  }
+
+  return message || fallbackText;
+};
+
+export const executeControlRequestWithRetry = async <T>(
+  execute: (forceRequest: boolean) => Promise<T>,
+  options: {
+    forceRequest?: boolean;
+    retries?: number;
+    shouldRetry?: (error: unknown) => boolean;
+  } = {}
+) => {
+  const retries = Math.max(0, options.retries ?? 1);
+  const shouldRetry = options.shouldRetry || isRetriableControlRequestError;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const forceRequest = Boolean(options.forceRequest) || attempt > 0;
+
+    try {
+      return await execute(forceRequest);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !shouldRetry(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Control request failed");
+};
+
 const ensureTerminalLine = (lines: string[][], row: number) => {
   while (lines.length <= row) {
     lines.push([]);

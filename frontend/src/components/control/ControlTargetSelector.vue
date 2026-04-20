@@ -320,7 +320,46 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__list--drawer {
-  max-height: 28vh;
+  max-height: 52vh;
+}
+
+.control-target-selector__list--drawer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.control-target-selector__list--drawer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+}
+
+.control-target-selector__list--drawer::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.4);
+  border-radius: 4px;
+}
+
+.control-target-selector__list--drawer::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.6);
+}
+
+@media (min-width: 993px) {
+  .control-target-selector:not(.control-target-selector--drawer) {
+    height: calc(100svh - 180px);
+    max-height: calc(100svh - 180px);
+  }
+
+  .control-target-selector:not(.control-target-selector--drawer) .control-panel--targets {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .control-target-selector:not(.control-target-selector--drawer) .control-target-selector__list--targets {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 .control-target-selector__card {

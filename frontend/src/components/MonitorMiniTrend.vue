@@ -79,4 +79,10 @@ watch(source, () => {
   height: 180px;
   margin-top: 12px;
 }
+
+@media (max-width: 640px) {
+  .monitor-mini-trend__chart {
+    height: 120px;
+  }
+}
 </style>

@@ -53,28 +53,32 @@ const buildMockNodes = (): ControlPreviewNode[] => {
           instanceId: CONTROL_PREVIEW_GLOBAL_TARGET_ID,
           displayName: "Host Shell",
           description: "使用 global0001 预览宿主机模式，不需要浏览器直连 daemon。",
-          status: INSTANCE_STATUS_CODE.RUNNING
+          status: INSTANCE_STATUS_CODE.RUNNING,
+          instanceType: "universal/web_shell"
         }),
         createTarget(nodeA, {
           mode: "instance",
           instanceId: "paper-lobby",
           displayName: "Lobby",
           description: "Paper 1.20.4，大厅服。",
-          status: INSTANCE_STATUS_CODE.RUNNING
+          status: INSTANCE_STATUS_CODE.RUNNING,
+          instanceType: "minecraft/java/paper"
         }),
         createTarget(nodeA, {
           mode: "instance",
           instanceId: "survival-main",
           displayName: "Survival",
           description: "主生存服，持续轮询 outputlog 预览。",
-          status: INSTANCE_STATUS_CODE.STARTING
+          status: INSTANCE_STATUS_CODE.STARTING,
+          instanceType: "minecraft/java/paper"
         }),
         createTarget(nodeA, {
           mode: "instance",
           instanceId: "proxy-gate",
           displayName: "Velocity Proxy",
           description: "代理层实例，适合观察命令转发反馈。",
-          status: INSTANCE_STATUS_CODE.STOPPED
+          status: INSTANCE_STATUS_CODE.STOPPED,
+          instanceType: "minecraft/java/velocity"
         })
       ]
     },
@@ -86,21 +90,24 @@ const buildMockNodes = (): ControlPreviewNode[] => {
           instanceId: CONTROL_PREVIEW_GLOBAL_TARGET_ID,
           displayName: "Host Shell",
           description: "宿主机命令入口，用于 open / command / outputlog / stop。",
-          status: INSTANCE_STATUS_CODE.STOPPED
+          status: INSTANCE_STATUS_CODE.STOPPED,
+          instanceType: "universal/web_shell"
         }),
         createTarget(nodeB, {
           mode: "instance",
           instanceId: "creative-test",
           displayName: "Creative Test",
           description: "创意测试服，便于确认样式下的实例操作流程。",
-          status: INSTANCE_STATUS_CODE.RUNNING
+          status: INSTANCE_STATUS_CODE.RUNNING,
+          instanceType: "minecraft/java/paper"
         }),
         createTarget(nodeB, {
           mode: "instance",
           instanceId: "forge-pack",
           displayName: "Forge Pack",
           description: "模组整合包实例，用于预览停止态与重启态。",
-          status: INSTANCE_STATUS_CODE.STOPPED
+          status: INSTANCE_STATUS_CODE.STOPPED,
+          instanceType: "minecraft/java/forge"
         })
       ]
     },
@@ -112,14 +119,16 @@ const buildMockNodes = (): ControlPreviewNode[] => {
           instanceId: CONTROL_PREVIEW_GLOBAL_TARGET_ID,
           displayName: "Host Shell",
           description: "节点离线时，后续这里会映射 Panel 侧错误处理。",
-          status: INSTANCE_STATUS_CODE.STOPPED
+          status: INSTANCE_STATUS_CODE.STOPPED,
+          instanceType: "universal/web_shell"
         }),
         createTarget(nodeC, {
           mode: "instance",
           instanceId: "backup-world",
           displayName: "Backup World",
           description: "离线节点上的实例，用于预览不可操作状态。",
-          status: INSTANCE_STATUS_CODE.STOPPED
+          status: INSTANCE_STATUS_CODE.STOPPED,
+          instanceType: "minecraft/java/paper"
         })
       ]
     }

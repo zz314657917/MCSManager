@@ -4,7 +4,10 @@ import ControlActionButtons, {
 } from "@/components/control/ControlActionButtons.vue";
 import GmOperationsPanel from "@/components/gm/GmOperationsPanel.vue";
 import { OPERATIONS_MOBILE_NAV_ITEMS } from "@/components/operations/mobileNav";
+import OperationsMobileNav from "@/components/operations/OperationsMobileNav.vue";
 import ControlTargetSelector from "@/components/control/ControlTargetSelector.vue";
+import ControlFeatureModalSchedule from "@/components/control/ControlFeatureModalSchedule.vue";
+import ControlFeatureModalServerConfig from "@/components/control/ControlFeatureModalServerConfig.vue";
 import OperationsPageShell from "@/components/operations/OperationsPageShell.vue";
 import { useControlDashboard } from "@/hooks/useControlDashboard";
 import { useControlPanelState } from "@/hooks/useControlPanelState";
@@ -23,8 +26,14 @@ import { getInstanceInfo as getInstanceInfoApi } from "@/services/apis/instance"
 import { useAppStateStore } from "@/stores/useAppStateStore";
 import { useAppToolsStore } from "@/stores/useAppToolsStore";
 import { getControlTargetIdentity, getControlTargetStatusColor, getControlTargetStatusText } from "@/tools/controlStatus";
+import {
+  createControlFeatureModalCard,
+  shouldOpenControlFeatureModal,
+  type ControlDesktopModalFeatureKey
+} from "@/tools/controlFeatureModal";
+import { getPreviewServerConfigFiles } from "@/tools/controlFeaturePreview";
 import type { ControlLogLine, ControlTarget } from "@/types/control";
-import type { InstanceDetail } from "@/types";
+import type { InstanceDetail, LayoutCard } from "@/types";
 import EventConfig from "@/widgets/instance/dialogs/EventConfig.vue";
 import InstanceDetailDialog from "@/widgets/instance/dialogs/InstanceDetail.vue";
 import InstanceFundamentalDetail from "@/widgets/instance/dialogs/InstanceFundamentalDetail.vue";
@@ -46,12 +55,13 @@ import {
   FolderOpenOutlined,
   MenuUnfoldOutlined,
   ReloadOutlined,
+  SearchOutlined,
   SendOutlined,
   TeamOutlined,
   UsergroupDeleteOutlined,
   UsbOutlined
 } from "@ant-design/icons-vue";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -61,6 +71,8 @@ const { openInputDialog } = useAppToolsStore();
 const { refresh: refreshServerConfig, serverConfigFiles } = useServerConfig();
 const { execute: executeInstanceInfo } = getInstanceInfoApi();
 const logBodyRef = ref<HTMLDivElement>();
+const commandInputRef = ref<InstanceType<typeof import("ant-design-vue").Input>>();
+const shellRef = ref<InstanceType<typeof OperationsPageShell>>();
 const isMobileSelectorOpen = ref(false);
 const terminalConfigDialog = ref<InstanceType<typeof TermConfig>>();
 const eventConfigDialog = ref<InstanceType<typeof EventConfig>>();
@@ -72,6 +84,20 @@ const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamen
 const ALL_CONTROL_TARGETS_FILTER = "__all_control_targets__";
 const targetFilterDaemonId = ref(ALL_CONTROL_TARGETS_FILTER);
 const currentInstanceDetail = ref<InstanceDetail>();
+const activeFeatureModal = ref<{
+  key: ControlDesktopModalFeatureKey;
+  title: string;
+  card: LayoutCard;
+}>();
+
+// Command history state
+const commandHistory = ref<string[]>([]);
+const commandHistoryIndex = ref(-1);
+const savedCommandInput = ref("");
+
+// Log filter state
+const logSearchQuery = ref("");
+const logLevelFilter = ref<"all" | "error" | "warn" | "command">("all");
 
 const isLocalPreviewMode = appState.userInfo?.token === "local-preview-token";
 const controlState = isLocalPreviewMode ? useControlPreviewState() : useControlPanelState();
@@ -223,6 +249,30 @@ const orderedCurrentTargets = computed(() => {
 
 const getLogClass = (line: ControlLogLine) => `terminal-line--${line.level}`;
 
+// Filtered logs based on search and level
+const filteredLogs = computed(() => {
+  let logs = currentLogs.value;
+
+  // Level filter
+  if (logLevelFilter.value !== "all") {
+    if (logLevelFilter.value === "error") {
+      logs = logs.filter((log) => log.level === "error");
+    } else if (logLevelFilter.value === "warn") {
+      logs = logs.filter((log) => log.level === "warn");
+    } else if (logLevelFilter.value === "command") {
+      logs = logs.filter((log) => log.level === "command");
+    }
+  }
+
+  // Search filter
+  if (logSearchQuery.value.trim()) {
+    const query = logSearchQuery.value.toLowerCase();
+    logs = logs.filter((log) => log.text.toLowerCase().includes(query));
+  }
+
+  return logs;
+});
+
 const handleRefresh = () => {
   refreshCurrentTarget();
   void refreshDashboard(true);
@@ -274,6 +324,53 @@ const handleEditTargetNote = async (target: ControlTarget) => {
   } catch {
     // ignore canceled input dialog
   }
+};
+
+// Command history handlers
+const handleCommandHistoryUp = () => {
+  if (commandHistory.value.length === 0) return;
+
+  if (commandHistoryIndex.value === -1) {
+    savedCommandInput.value = commandInput.value;
+    commandHistoryIndex.value = commandHistory.value.length - 1;
+  } else if (commandHistoryIndex.value > 0) {
+    commandHistoryIndex.value -= 1;
+  }
+
+  commandInput.value = commandHistory.value[commandHistoryIndex.value];
+};
+
+const handleCommandHistoryDown = () => {
+  if (commandHistory.value.length === 0 || commandHistoryIndex.value === -1) return;
+
+  if (commandHistoryIndex.value < commandHistory.value.length - 1) {
+    commandHistoryIndex.value += 1;
+    commandInput.value = commandHistory.value[commandHistoryIndex.value];
+  } else {
+    commandHistoryIndex.value = -1;
+    commandInput.value = savedCommandInput.value;
+  }
+};
+
+const handleSendCommandWithHistory = async () => {
+  const trimmedCommand = commandInput.value.trim();
+  if (!trimmedCommand) return;
+
+  // Add to history if not duplicate of last command
+  if (commandHistory.value[commandHistory.value.length - 1] !== trimmedCommand) {
+    commandHistory.value.push(trimmedCommand);
+    // Keep only last 100 commands
+    if (commandHistory.value.length > 100) {
+      commandHistory.value.shift();
+    }
+  }
+
+  // Reset history navigation
+  commandHistoryIndex.value = -1;
+  savedCommandInput.value = "";
+
+  // Execute the actual send command
+  await sendCommand();
 };
 
 const openPlayersPage = () => {
@@ -334,6 +431,32 @@ const openControlFeatureRoute = (path: string, extraQuery: Record<string, any> =
   });
 };
 
+const openControlFeatureModal = (key: ControlDesktopModalFeatureKey, title: string) => {
+  if (!currentTarget.value || currentTarget.value.mode !== "instance") return;
+
+  activeFeatureModal.value = {
+    key,
+    title,
+    card: createControlFeatureModalCard({
+      featureKey: key,
+      title,
+      daemonId: currentTarget.value.daemonId,
+      instanceId: currentTarget.value.instanceId,
+      instanceType: currentTarget.value.instanceType
+    })
+  };
+};
+
+const closeControlFeatureModal = () => {
+  activeFeatureModal.value = undefined;
+};
+
+const currentFeatureModalComponent = computed(() => {
+  if (activeFeatureModal.value?.key === "schedule") return ControlFeatureModalSchedule;
+  if (activeFeatureModal.value?.key === "server-config") return ControlFeatureModalServerConfig;
+  return undefined;
+});
+
 const openControlDialog = async (
   dialog:
     | InstanceType<typeof TermConfig>
@@ -358,7 +481,7 @@ const controlFeatureItems = computed<ControlFeatureShortcut[]>(() => {
   const items: ControlFeatureShortcut[] = [
     {
       key: "legacy-terminal",
-      title: t("TXT_CODE_524e3036"),
+      title: t("TXT_CODE_CONTROL_ADVANCED_TERMINAL"),
       icon: CodeOutlined,
       click: openLegacyInstancePage
     },
@@ -366,17 +489,32 @@ const controlFeatureItems = computed<ControlFeatureShortcut[]>(() => {
       key: "server-config",
       title: t("TXT_CODE_d07742fe"),
       icon: ControlOutlined,
-      disabled: !serverConfigFiles.value?.length,
-      click: () =>
+      disabled: isLocalPreviewMode
+        ? getPreviewServerConfigFiles(target.instanceType).length === 0
+        : !serverConfigFiles.value?.length,
+      click: () => {
+        if (shouldOpenControlFeatureModal("server-config", isPhone.value)) {
+          openControlFeatureModal("server-config", t("TXT_CODE_d07742fe"));
+          return;
+        }
+
         openControlFeatureRoute("/instances/terminal/serverConfig", {
           type: target.instanceType
-        })
+        });
+      }
     },
     {
       key: "schedule",
       title: t("TXT_CODE_b7d026f8"),
       icon: FieldTimeOutlined,
-      click: () => openControlFeatureRoute("/instances/schedule")
+      click: () => {
+        if (shouldOpenControlFeatureModal("schedule", isPhone.value)) {
+          openControlFeatureModal("schedule", t("TXT_CODE_b7d026f8"));
+          return;
+        }
+
+        openControlFeatureRoute("/instances/schedule");
+      }
     },
     {
       key: "term-config",
@@ -472,13 +610,13 @@ const handleStopCurrentTarget = () => {
   if (!currentTarget.value) return;
 
   Modal.confirm({
-    title: t("TXT_CODE_276756b2"),
+    title: t("TXT_CODE_CONTROL_CONFIRM_STOP"),
     content:
       currentTarget.value.mode === "global"
-        ? "确认关闭宿主机模式终端吗？"
-        : "确认停止当前实例吗？",
+        ? t("TXT_CODE_CONTROL_CONFIRM_CLOSE_HOST")
+        : t("TXT_CODE_CONTROL_CONFIRM_STOP_INSTANCE"),
     okText: t("TXT_CODE_148d6467"),
-    cancelText: t("TXT_CODE_5366af54"),
+    cancelText: t("TXT_CODE_a0451c97"),
     okButtonProps: {
       danger: true
     },
@@ -492,10 +630,10 @@ const handleRestartCurrentTarget = () => {
   if (currentTarget.value?.mode !== "instance") return;
 
   Modal.confirm({
-    title: t("TXT_CODE_276756b2"),
-    content: "确认重启当前实例吗？",
+    title: t("TXT_CODE_77cc12da"),
+    content: t("TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE"),
     okText: t("TXT_CODE_77cc12da"),
-    cancelText: t("TXT_CODE_5366af54"),
+    cancelText: t("TXT_CODE_a0451c97"),
     async onOk() {
       await restartCurrentTarget();
     }
@@ -509,7 +647,7 @@ const handleTerminateCurrentTarget = () => {
     title: t("TXT_CODE_893567ac"),
     content: t("TXT_CODE_ec08484"),
     okText: t("TXT_CODE_7b67813a"),
-    cancelText: t("TXT_CODE_5366af54"),
+    cancelText: t("TXT_CODE_a0451c97"),
     okButtonProps: {
       danger: true
     },
@@ -566,11 +704,41 @@ watch(
   },
   { immediate: true }
 );
+
+// Keyboard shortcuts
+const handleGlobalKeydown = (event: KeyboardEvent) => {
+  // Ctrl+R: Refresh
+  if (event.ctrlKey && event.key === "r") {
+    event.preventDefault();
+    handleRefresh();
+    return;
+  }
+
+  // Ctrl+Enter: Send command (when not focused on input)
+  if (event.ctrlKey && event.key === "Enter") {
+    const target = event.target as HTMLElement;
+    if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA") {
+      event.preventDefault();
+      if (commandInput.value.trim()) {
+        void handleSendCommandWithHistory();
+      }
+    }
+  }
+};
+
+onMounted(() => {
+  window.addEventListener("keydown", handleGlobalKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleGlobalKeydown);
+});
 </script>
 
 <template>
   <div class="control-console" data-testid="control-console">
     <OperationsPageShell
+      ref="shellRef"
       :title="t('TXT_CODE_CONTROL_TITLE')"
       :eyebrow="controlEyebrow"
       :back-label="t('TXT_CODE_e21473bc')"
@@ -579,20 +747,22 @@ watch(
       mobile-body-padding-bottom="12px"
       :mobile-nav-items="OPERATIONS_MOBILE_NAV_ITEMS"
       :hide-desktop-header="true"
+      :hide-mobile-header="true"
+      :hide-eyebrow-on-mobile="true"
     >
       <template #header-actions="{ isPhone: shellIsPhone }">
         <a-button v-if="!shellIsPhone" @click="openPlayersPage">
           <template #icon>
             <TeamOutlined />
           </template>
-          <span>GM 管理</span>
+          <span>{{ t("TXT_CODE_GM_MANAGEMENT") }}</span>
         </a-button>
 
         <a-button v-if="currentTarget && !shellIsPhone" @click="openLegacyInstancePage">
           <template #icon>
             <AppstoreOutlined />
           </template>
-          <span>应用实例</span>
+          <span>{{ t("TXT_CODE_CONTROL_INSTANCE_PAGE") }}</span>
         </a-button>
 
         <template v-if="currentTarget && !shellIsPhone">
@@ -643,13 +813,13 @@ watch(
             <template #icon>
               <TeamOutlined />
             </template>
-            <span>GM 管理</span>
+            <span>{{ t("TXT_CODE_GM_MANAGEMENT") }}</span>
           </a-button>
           <a-button @click="openLegacyInstancePage">
             <template #icon>
               <AppstoreOutlined />
             </template>
-            <span>应用实例</span>
+            <span>{{ t("TXT_CODE_CONTROL_INSTANCE_PAGE") }}</span>
           </a-button>
           <a-button :loading="isRefreshBusy" @click="handleRefresh">
             <template #icon>
@@ -835,10 +1005,21 @@ watch(
             <div class="control-console__terminal-heading">
               <div class="control-console__terminal-title">{{ terminalTitle }}</div>
               <div class="control-console__terminal-meta">
-                outputlog / {{ pollIntervalMs }}ms
+                {{ t("TXT_CODE_CONTROL_TERMINAL_POLL_INTERVAL", { interval: pollIntervalMs }) }}
               </div>
             </div>
             <div v-if="!isPhone" class="control-console__terminal-actions">
+              <a-input
+                v-model:value="logSearchQuery"
+                :placeholder="t('TXT_CODE_CONTROL_SEARCH_LOGS')"
+                allow-clear
+                size="small"
+                class="control-console__terminal-search"
+              >
+                <template #prefix>
+                  <SearchOutlined style="color: rgba(0, 0, 0, 0.25)" />
+                </template>
+              </a-input>
               <a-button size="small" @click="togglePolling">
                 {{ isPollingPaused ? t("TXT_CODE_ed3fc23") : t("TXT_CODE_CONTROL_PAUSE") }}
               </a-button>
@@ -849,39 +1030,60 @@ watch(
             </div>
           </div>
 
-          <div
-            ref="logBodyRef"
-            class="control-console__terminal-body"
-            :class="{ 'control-console__terminal-body--mobile': isPhone }"
-            data-testid="control-terminal-body"
-          >
-            <template v-if="currentLogs.length > 0">
-              <div
-                v-for="line in currentLogs"
-                :key="line.id"
-                class="terminal-line"
-                :class="getLogClass(line)"
-              >
-                <span class="terminal-line__time">{{ line.time }}</span>
-                <span class="terminal-line__text">{{ line.text }}</span>
-              </div>
-            </template>
-            <a-empty v-else class="control-console__terminal-empty" :description="t('TXT_CODE_5415f009')" />
+          <!-- Log level filter bar -->
+          <div class="control-console__log-level-filters">
+            <a-segmented
+              v-model:value="logLevelFilter"
+              :options="[
+                { label: t('TXT_CODE_CONTROL_FILTER_ALL'), value: 'all' },
+                { label: t('TXT_CODE_CONTROL_FILTER_ERROR'), value: 'error' },
+                { label: t('TXT_CODE_CONTROL_FILTER_WARN'), value: 'warn' },
+                { label: t('TXT_CODE_CONTROL_FILTER_COMMAND'), value: 'command' }
+              ]"
+              size="small"
+              class="control-console__log-level-filter"
+            />
+          </div>
+
+          <div class="control-console__terminal-body-wrap">
+            <div
+              ref="logBodyRef"
+              class="control-console__terminal-body"
+              :class="{ 'control-console__terminal-body--mobile': isPhone }"
+              data-testid="control-terminal-body"
+            >
+              <template v-if="filteredLogs.length > 0">
+                <div
+                  v-for="line in filteredLogs"
+                  :key="line.id"
+                  class="terminal-line"
+                  :class="getLogClass(line)"
+                >
+                  <span class="terminal-line__time">{{ line.time }}</span>
+                  <span class="terminal-line__text">{{ line.text }}</span>
+                </div>
+              </template>
+              <a-empty v-else-if="currentLogs.length > 0 && filteredLogs.length === 0" class="control-console__terminal-empty" :description="t('TXT_CODE_CONTROL_SEARCH_LOGS')" />
+              <a-empty v-else class="control-console__terminal-empty" :description="t('TXT_CODE_5415f009')" />
+            </div>
           </div>
 
           <div class="control-console__terminal-input" data-testid="control-terminal-input-row">
             <a-input
+              ref="commandInputRef"
               v-model:value="commandInput"
               :disabled="!currentTarget.daemonAvailable"
               :placeholder="commandPlaceholder"
               data-testid="control-command-input"
-              @press-enter="sendCommand"
+              @press-enter="handleSendCommandWithHistory"
+              @keydown.up.prevent="handleCommandHistoryUp"
+              @keydown.down.prevent="handleCommandHistoryDown"
             />
             <a-button
               type="primary"
               :disabled="!commandInput.trim()"
               data-testid="control-command-send"
-              @click="sendCommand"
+              @click="handleSendCommandWithHistory"
             >
               <template #icon>
                 <SendOutlined />
@@ -928,6 +1130,12 @@ watch(
       </section>
     </OperationsPageShell>
 
+    <OperationsMobileNav
+      v-if="shellRef?.isPhone && OPERATIONS_MOBILE_NAV_ITEMS.length"
+      :items="OPERATIONS_MOBILE_NAV_ITEMS"
+      class="control-console__mobile-nav"
+    />
+
     <a-drawer
       v-if="isPhone"
       placement="bottom"
@@ -956,7 +1164,7 @@ watch(
 
     <a-modal
       v-model:open="isPlayerModalOpen"
-      :title="currentPlayer ? `${currentPlayer.playerName} / GM 管理` : 'GM 管理'"
+      :title="currentPlayer ? `${currentPlayer.playerName} / ${t('TXT_CODE_GM_MANAGEMENT')}` : t('TXT_CODE_GM_MANAGEMENT')"
       :footer="null"
       :width="isPhone ? 'calc(100vw - 16px)' : 960"
       destroy-on-close
@@ -987,6 +1195,27 @@ watch(
           :busy="isExecutingAction || isDetailLoading"
           :on-execute="executePlayerAction"
           :on-refresh-inventory="() => loadInventory(true)"
+        />
+      </div>
+    </a-modal>
+
+    <a-modal
+      :open="Boolean(activeFeatureModal)"
+      :title="activeFeatureModal?.title"
+      :footer="null"
+      :width="1200"
+      destroy-on-close
+      centered
+      :body-style="{ padding: '12px 16px 16px', overflow: 'hidden' }"
+      @cancel="closeControlFeatureModal"
+    >
+      <div class="control-console__feature-modal-body">
+        <component
+          :is="currentFeatureModalComponent"
+          v-if="activeFeatureModal && currentFeatureModalComponent"
+          :key="activeFeatureModal.card.id"
+          :card="activeFeatureModal.card"
+          :preview="isLocalPreviewMode"
         />
       </div>
     </a-modal>
@@ -1056,6 +1285,14 @@ watch(
       radial-gradient(circle at top right, rgba(22, 163, 74, 0.12), transparent 28%),
       var(--background-color);
   }
+}
+
+.control-console__mobile-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
 }
 
 .control-console__desktop-toolbar {
@@ -1459,7 +1696,7 @@ watch(
 .control-console__metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   padding: 0 18px;
 }
 
@@ -1470,11 +1707,28 @@ watch(
   flex-direction: column;
   gap: 6px;
   min-height: 104px;
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(255, 255, 255, 0.98));
-  --metric-accent: rgba(59, 130, 246, 0.38);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 0.92) 100%
+  );
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, 0.04),
+    0 1px 3px rgba(15, 23, 42, 0.02);
+  --metric-accent: rgba(59, 130, 246, 0.35);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.control-console__metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.08),
+    0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
 .control-console__metric-card::before {
@@ -1482,9 +1736,10 @@ watch(
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  right: 0;
   height: 3px;
   background: var(--metric-accent);
+  border-radius: 16px 16px 0 0;
 }
 
 .control-console__metric-card.is-success {
@@ -1641,11 +1896,16 @@ watch(
   margin-bottom: 14px;
 }
 
+.control-console__feature-modal-body {
+  height: 72vh;
+  min-height: 620px;
+}
+
 .control-panel--terminal {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   overflow: hidden;
 }
 
@@ -1679,20 +1939,73 @@ watch(
 .control-console__terminal-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.control-console__terminal-body {
+.control-console__terminal-search {
+  width: 180px;
+}
+
+.control-console__terminal-search :deep(.ant-input) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: #dbeafe;
+}
+
+.control-console__terminal-search :deep(.ant-input::placeholder) {
+  color: rgba(191, 219, 254, 0.45);
+}
+
+.control-console__log-level-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.control-console__terminal-body-wrap {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #0a1628 0%, #0f2137 100%);
+  border-radius: 0 0 20px 20px;
+}
+
+.control-console__log-level-filter {
+  flex-shrink: 0;
+}
+
+.control-console__log-level-filter :deep(.ant-segmented-item) {
+  color: rgba(191, 219, 254, 0.7);
+}
+
+.control-console__log-level-filter :deep(.ant-segmented-item-selected) {
+  background: rgba(59, 130, 246, 0.3);
+  color: #fff;
+}
+
+.control-console__terminal-body {
+  position: relative;
+  min-height: 0;
+  flex: 1;
   overflow-y: auto;
   padding: 16px 18px;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 32%),
-    linear-gradient(180deg, #081120 0%, #0b1526 100%);
   color: #dbeafe;
   font-family:
     Consolas, "SFMono-Regular", Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
+}
+
+.control-console__terminal-body :deep(.ant-empty) {
+  padding-top: 48px;
+}
+
+.control-console__terminal-body :deep(.ant-empty-description) {
+  color: rgba(191, 219, 254, 0.6);
 }
 
 .terminal-line {
@@ -1705,7 +2018,8 @@ watch(
 }
 
 .terminal-line__time {
-  color: rgba(191, 219, 254, 0.62);
+  color: rgba(148, 163, 184, 0.6);
+  font-size: 12px;
 }
 
 .terminal-line__text {
@@ -1714,15 +2028,18 @@ watch(
 }
 
 .terminal-line--warn .terminal-line__text {
-  color: #fde68a;
+  color: #fbbf24;
+  font-weight: 500;
 }
 
 .terminal-line--error .terminal-line__text {
-  color: #fca5a5;
+  color: #f87171;
+  font-weight: 600;
 }
 
 .terminal-line--command .terminal-line__text {
-  color: #86efac;
+  color: #4ade80;
+  font-weight: 500;
 }
 
 .control-console__terminal-empty {

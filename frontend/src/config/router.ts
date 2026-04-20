@@ -30,6 +30,7 @@ export interface RouterMetaInfo {
   condition?: () => boolean;
   chromeMode?: "default" | "minimal";
   desktopChromeMode?: "default" | "top-nav";
+  mobileChromeMode?: "default" | "minimal";
   breadcrumbs?: Array<{
     name: string;
     path: string;
@@ -117,7 +118,8 @@ const originRouterConfig: RouterConfig[] = [
       permission: ROLE.ADMIN,
       mainMenu: true,
       chromeMode: "minimal",
-      desktopChromeMode: "top-nav"
+      desktopChromeMode: "top-nav",
+      mobileChromeMode: "default"
     }
   },
   {

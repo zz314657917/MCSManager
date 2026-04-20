@@ -2,13 +2,13 @@ import Router from "@koa/router";
 import { ROLE } from "../entity/user";
 import permission from "../middleware/permission";
 import RemoteRequest from "../service/remote_command";
+import { aggregateMonitorOverview, type IMonitorNodeOverviewInput } from "../service/monitor_overview";
 import RemoteServiceSubsystem from "../service/remote_service";
 
 const router = new Router({ prefix: "/monitor" });
 
 router.get("/servers", permission({ level: ROLE.ADMIN }), async (ctx) => {
-  const nodes: IMcsmMonitorNodeOverview[] = [];
-  const servers: IMcsmMonitorOverviewResponse["servers"] = [];
+  const nodesInput: IMonitorNodeOverviewInput[] = [];
 
   for (const remoteService of RemoteServiceSubsystem.services.values()) {
     let overview:
@@ -25,43 +25,19 @@ router.get("/servers", permission({ level: ROLE.ADMIN }), async (ctx) => {
       overview = undefined;
     }
 
-    const nodeItem: IMcsmMonitorNodeOverview = {
+    nodesInput.push({
       daemonId: remoteService.uuid,
       daemonIp: remoteService.config.ip,
       daemonPort: remoteService.config.port,
       daemonPrefix: remoteService.config.prefix,
       daemonRemarks: remoteService.config.remarks,
-      available: remoteService.available,
-      host: overview?.host,
-      servers: overview?.servers ?? []
-    };
-    nodes.push(nodeItem);
-
-    for (const server of nodeItem.servers) {
-      servers.push({
-        ...server,
-        daemonId: nodeItem.daemonId,
-        daemonRemarks: nodeItem.daemonRemarks,
-        daemonIp: nodeItem.daemonIp,
-        daemonPort: nodeItem.daemonPort,
-        daemonPrefix: nodeItem.daemonPrefix,
-        daemonAvailable: nodeItem.available
-      });
-    }
+      remoteAvailable: remoteService.available,
+      overviewAvailable: Boolean(overview),
+      overview
+    });
   }
 
-  ctx.body = {
-    generatedAt: Date.now(),
-    summary: {
-      nodesTotal: nodes.length,
-      nodesOnline: nodes.filter((node) => node.available).length,
-      serversTotal: servers.length,
-      serversRunning: servers.filter((server) => server.processRunning).length,
-      pluginOnline: servers.filter((server) => server.plugin.online).length
-    },
-    nodes,
-    servers
-  } satisfies IMcsmMonitorOverviewResponse;
+  ctx.body = aggregateMonitorOverview(nodesInput) satisfies IMcsmMonitorOverviewResponse;
 });
 
 export default router;

@@ -4,7 +4,18 @@ setlocal
 set "ROOT=%~dp0"
 set "FRONTEND_DIR=%ROOT%frontend"
 set "READY_URL=http://127.0.0.1:5173/index.html"
-set "PREVIEW_URL=http://127.0.0.1:5173/index.html#/control"
+set "PREVIEW_ROUTE=%~1"
+
+if "%PREVIEW_ROUTE%"=="" set "PREVIEW_ROUTE=control"
+
+if /I "%PREVIEW_ROUTE%"=="control" set "PREVIEW_ROUTE=/control"
+if /I "%PREVIEW_ROUTE%"=="gm" set "PREVIEW_ROUTE=/gm"
+if /I "%PREVIEW_ROUTE%"=="gm-chat" set "PREVIEW_ROUTE=/gm/chat"
+if /I "%PREVIEW_ROUTE%"=="players" set "PREVIEW_ROUTE=/players"
+
+if not "%PREVIEW_ROUTE:~0,1%"=="/" set "PREVIEW_ROUTE=/%PREVIEW_ROUTE%"
+
+set "PREVIEW_URL=http://127.0.0.1:5173/index.html#%PREVIEW_ROUTE%"
 
 if not exist "%FRONTEND_DIR%\package.json" (
   echo frontend directory not found: "%FRONTEND_DIR%"
@@ -62,5 +73,6 @@ if errorlevel 1 (
 )
 
 start "" "%PREVIEW_URL%"
+echo Opened preview route: %PREVIEW_ROUTE%
 echo Opened: %PREVIEW_URL%
 exit /b 0

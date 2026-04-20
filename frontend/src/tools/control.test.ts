@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectDaemonIdsToHydrate,
+  executeControlRequestWithRetry,
   normalizeControlOutputLog,
+  resolveControlRequestErrorText,
   splitControlOutputLog
 } from "./control";
 
@@ -106,5 +108,45 @@ describe("control panel target hydration", () => {
         }
       )
     ).toEqual(["daemon-a", "daemon-b"]);
+  });
+});
+
+describe("control request retry handling", () => {
+  it("retries transient request failures once before succeeding", async () => {
+    const forceRequests: boolean[] = [];
+
+    const result = await executeControlRequestWithRetry(async (forceRequest) => {
+      forceRequests.push(forceRequest);
+      if (forceRequests.length === 1) {
+        throw new Error("Network Error");
+      }
+      return "ok";
+    });
+
+    expect(result).toBe("ok");
+    expect(forceRequests).toEqual([false, true]);
+  });
+
+  it("does not retry non-transient request failures", async () => {
+    let attempts = 0;
+
+    await expect(
+      executeControlRequestWithRetry(async () => {
+        attempts += 1;
+        throw new Error("403 forbidden");
+      })
+    ).rejects.toThrow("403 forbidden");
+
+    expect(attempts).toBe(1);
+  });
+
+  it("preserves the original backend message when it is already specific", () => {
+    expect(
+      resolveControlRequestErrorText(new Error("令牌(Token)验证失败，拒绝访问"), "加载节点列表失败", {
+        forbiddenText: "权限不足，无法执行当前控制操作",
+        serverErrorText: "Panel 服务异常，请稍后重试",
+        networkErrorText: "网络异常，无法连接 Panel"
+      })
+    ).toBe("令牌(Token)验证失败，拒绝访问");
   });
 });

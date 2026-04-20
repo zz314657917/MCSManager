@@ -7,7 +7,8 @@ import { formatMemoryUsage } from "@/tools/memory";
 import { parseTimestamp } from "@/tools/time";
 import type { LayoutCard } from "@/types";
 import { CloudServerOutlined, ConsoleSqlOutlined, ReloadOutlined } from "@ant-design/icons-vue";
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { useScreen } from "@/hooks/useScreen";
 import { useRouter } from "vue-router";
 
 const props = defineProps<{
@@ -16,6 +17,18 @@ const props = defineProps<{
 
 const router = useRouter();
 const { state, refresh, isLoading } = useMonitorOverview();
+const { isPhone } = useScreen();
+
+const expandedRowKeys = ref<string[]>([]);
+
+const toggleRowExpand = (key: string) => {
+  const idx = expandedRowKeys.value.indexOf(key);
+  if (idx >= 0) {
+    expandedRowKeys.value.splice(idx, 1);
+  } else {
+    expandedRowKeys.value.push(key);
+  }
+};
 
 type MonitorOverviewRecord = IMcsmMonitorOverviewResponse["servers"][number] & {
   key: string;
@@ -296,7 +309,157 @@ const getTrendData = (record: MonitorOverviewRecord, field: "tps" | "onlinePlaye
         </div>
       </div>
 
+      <!-- Mobile card list -->
+      <div v-if="isPhone" class="monitor-mobile-list">
+        <div
+          v-for="record in dataSource"
+          :key="record.key"
+          class="monitor-mobile-card"
+          :class="{ 'monitor-mobile-card--expanded': expandedRowKeys.includes(record.key) }"
+        >
+          <div class="monitor-mobile-card__header" @click="toggleRowExpand(record.key)">
+            <div class="monitor-mobile-card__main">
+              <div class="server-name-cell">
+                <CloudServerOutlined />
+                <span>{{ record.instanceName }}</span>
+              </div>
+              <div class="monitor-mobile-card__meta">
+                <a-tag :color="record.processRunning ? 'green' : 'default'" size="small">
+                  {{ formatProcessStatus(record.statusText) }}
+                </a-tag>
+                <span class="server-subtext">{{ record.daemonRemarks || record.daemonIp }}</span>
+              </div>
+            </div>
+            <div class="monitor-mobile-card__metrics">
+              <div class="monitor-mobile-card__metric">
+                <span class="monitor-mobile-card__metric-label">CPU</span>
+                <span class="monitor-mobile-card__metric-value">{{ record.procCpuText }}</span>
+              </div>
+              <div class="monitor-mobile-card__metric">
+                <span class="monitor-mobile-card__metric-label">内存</span>
+                <span class="monitor-mobile-card__metric-value">{{ record.procMemText }}</span>
+              </div>
+              <div class="monitor-mobile-card__metric">
+                <span class="monitor-mobile-card__metric-label">TPS</span>
+                <span class="monitor-mobile-card__metric-value">{{ record.tpsText }}</span>
+              </div>
+              <div class="monitor-mobile-card__metric">
+                <span class="monitor-mobile-card__metric-label">人数</span>
+                <span class="monitor-mobile-card__metric-value">{{ record.playersText }}</span>
+              </div>
+            </div>
+          </div>
+
+          <a-collapse :active-key="expandedRowKeys.includes(record.key) ? [record.key] : []" ghost>
+            <a-collapse-panel :key="record.key">
+              <div class="monitor-expand">
+                <div class="monitor-expand__host-summary">
+                  <div class="monitor-expand__host-card">
+                    <div class="monitor-expand__host-label">节点状态</div>
+                    <div class="monitor-expand__host-value">
+                      <a-tag :color="record.daemonAvailable ? 'green' : 'default'" size="small">
+                        {{ record.nodeStatusText }}
+                      </a-tag>
+                    </div>
+                  </div>
+                  <div class="monitor-expand__host-card">
+                    <div class="monitor-expand__host-label">主机 CPU</div>
+                    <div
+                      class="monitor-expand__host-value"
+                      :style="{ color: getUsageColor(record.nodeHost?.cpuPercent ?? 0, 'var(--color-primary)') }"
+                    >
+                      {{ record.hostCpuText }}
+                    </div>
+                  </div>
+                  <div class="monitor-expand__host-card">
+                    <div class="monitor-expand__host-label">主机内存</div>
+                    <div class="monitor-expand__host-value">{{ record.hostMemText }}</div>
+                  </div>
+                  <div class="monitor-expand__host-card">
+                    <div class="monitor-expand__host-label">主机磁盘</div>
+                    <div class="monitor-expand__host-value">{{ record.hostDiskText }}</div>
+                  </div>
+                </div>
+
+                <div class="monitor-expand__charts">
+                  <NodeSimpleChart
+                    :cpu-data="getCpuChartData(record)"
+                    :mem-data="getMemChartData(record)"
+                    :cpu-usage="record.procCpuText"
+                    :mem-usage="formatPercent(record.process.memoryPercent)"
+                  />
+                </div>
+
+                <div class="monitor-expand__trends">
+                  <MonitorMiniTrend
+                    title="TPS 趋势"
+                    :current-text="record.tpsText"
+                    :max="20"
+                    :data="getTrendData(record, 'tps')"
+                  />
+                  <MonitorMiniTrend
+                    title="在线人数趋势"
+                    :current-text="record.playersText"
+                    :data="getTrendData(record, 'onlinePlayers')"
+                  />
+                </div>
+
+                <div v-if="record.hostDisks.length" class="monitor-expand__disk-list">
+                  <div
+                    v-for="disk in record.hostDisks"
+                    :key="`${record.key}-${disk.mount}`"
+                    class="monitor-expand__disk-item"
+                  >
+                    <div class="monitor-expand__disk-top">
+                      <span class="server-subtext">{{ disk.device }}</span>
+                      <span class="server-subtext">{{ disk.mount }}</span>
+                    </div>
+                    <div class="monitor-expand__disk-main">
+                      <span>{{ formatMemoryUsage(disk.usedBytes) }} / {{ formatMemoryUsage(disk.totalBytes) }}</span>
+                      <span>{{ formatMemoryUsage(disk.freeBytes) }} 可用</span>
+                      <span>{{ disk.usagePercent.toFixed(1) }}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <a-descriptions bordered size="small" :column="1" class="monitor-expand__desc">
+                  <a-descriptions-item label="实例 ID">{{ record.instanceId }}</a-descriptions-item>
+                  <a-descriptions-item label="进程 PID">{{ record.process.pid ?? "--" }}</a-descriptions-item>
+                  <a-descriptions-item label="服务端版本">
+                    {{ record.plugin.serverVersion || "--" }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="插件版本">
+                    {{ record.plugin.pluginVersion || "--" }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="MOTD">
+                    {{ record.plugin.motd || "--" }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="世界">
+                    {{ record.plugin.worlds.length ? record.plugin.worlds.join(", ") : "--" }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="最后心跳">
+                    {{ record.plugin.lastSeen ? parseTimestamp(record.plugin.lastSeen) : "--" }}
+                  </a-descriptions-item>
+                  <a-descriptions-item label="主线程">
+                    {{ record.plugin.mainThreadBlocked ? "阻塞" : "正常" }}
+                  </a-descriptions-item>
+                </a-descriptions>
+
+                <div class="monitor-mobile-card__actions">
+                  <a-button type="primary" size="small" @click.stop="toTerminalFromRow(record)">
+                    <ConsoleSqlOutlined />
+                    终端
+                  </a-button>
+                </div>
+              </div>
+            </a-collapse-panel>
+          </a-collapse>
+        </div>
+      </div>
+
+      <!-- Desktop table -->
       <a-table
+        v-else
         :columns="columns"
         :data-source="dataSource"
         :pagination="false"
@@ -540,6 +703,127 @@ const getTrendData = (record: MonitorOverviewRecord, field: "tps" | "onlinePlaye
   }
 
   .monitor-expand__host-summary,
+  .monitor-expand__trends {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .monitor-overview-card__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .monitor-overview-card__summary-item {
+    padding: 10px 12px;
+    border-radius: 10px;
+  }
+
+  .monitor-overview-card__summary-value {
+    font-size: 16px;
+    margin-top: 4px;
+  }
+
+  .monitor-overview-card__summary-label {
+    font-size: 11px;
+  }
+}
+
+/* Mobile card list */
+.monitor-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.monitor-mobile-card {
+  border: 1px solid var(--card-border-color);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.96), rgba(244, 247, 251, 0.96));
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.monitor-mobile-card--expanded {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
+}
+
+.monitor-mobile-card__header {
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.monitor-mobile-card__main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.monitor-mobile-card__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.monitor-mobile-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.monitor-mobile-card__metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  background: rgba(59, 130, 246, 0.04);
+  border-radius: 8px;
+}
+
+.monitor-mobile-card__metric-label {
+  font-size: 10px;
+  color: var(--color-gray-7);
+}
+
+.monitor-mobile-card__metric-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.monitor-mobile-card__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border-color);
+}
+
+.monitor-mobile-card :deep(.ant-collapse-header) {
+  display: none;
+}
+
+.monitor-mobile-card :deep(.ant-collapse-content-box) {
+  padding: 0 14px 14px;
+}
+
+/* Mobile expanded row grid adjustments */
+@media (max-width: 640px) {
+  .monitor-mobile-card__metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .monitor-expand__host-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .monitor-expand__trends {
     grid-template-columns: 1fr;
   }

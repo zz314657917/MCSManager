@@ -4,7 +4,9 @@
   "description": "Provides remote control capability for MCSManager to manage processes, scheduled tasks, I/O streams, and more",
   "scripts": {
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && node --enable-source-maps production/app.js\"",
-    "build": "webpack --config webpack.config.js"
+    "build": "webpack --config webpack.config.js",
+    "test:monitor": "ts-node --files src/service/monitor_service.test.ts",
+    "test:host-metrics": "ts-node --files src/service/host_metrics.test.ts"
   },
   "homepage": "https://mcsmanager.com/",
   "author": "https://github.com/yumao233",

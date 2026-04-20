@@ -2,7 +2,7 @@
 title: Project Map
 type: project-map
 repo: MCSManager-monitor
-last_verified: 2026-04-15
+last_verified: 2026-04-20
 ---
 
 # 主要模块
@@ -36,12 +36,22 @@ last_verified: 2026-04-15
 - 实例列表：`frontend/src/widgets/InstanceList.vue`
 - 实例工作台：`frontend/src/widgets/instance/InstanceWorkspace.vue`
 - 终端核心：`frontend/src/components/TerminalCore.vue`
+- 控制台页：`frontend/src/views/ControlConsole.vue`
+- GM 页：`frontend/src/views/GMConsole.vue`
+- 控制台状态与 target 加载：`frontend/src/hooks/useControlPanelState.ts`
+- standalone preview 状态：`frontend/src/hooks/useControlPreviewState.ts`
+- control 工具与测试：`frontend/src/tools/control.ts`、`frontend/src/tools/control.test.ts`
+- control feature modal / preview 工具：`frontend/src/tools/controlFeatureModal.ts`、`frontend/src/tools/controlFeaturePreview.ts`
+- control/GM 页面文档：`knowledge/frontend/control-console.md`
+- standalone preview 文档：`knowledge/frontend/standalone-preview.md`
 
 # 后端关键位置
 - Panel 路由：`panel/src/app/routers/`
 - Daemon 服务：`daemon/src/service/`
 - 监控聚合入口：`panel/src/app/routers/monitor_router.ts`
 - 监控采样逻辑：`daemon/src/service/monitor_service.ts`
+- GM 路由：`panel/src/app/routers/gm_router.ts`、`daemon/src/routers/gm_router.ts`
+- GM 服务：`daemon/src/service/gm_service.ts`
 
 # 插件关键位置
 - Maven 配置：`mcsm-monitor-plugin/pom.xml`
@@ -54,9 +64,16 @@ last_verified: 2026-04-15
 - 构建命令：`npm.cmd run build`
 - 测试命令：`npm.cmd test`
 
+# 测试与预览位置
+- 前端 e2e：`frontend/tests/e2e/`
+- 仓库预览入口：`open-h5-preview.bat`、`打开H5预览.bat`
+- 控制页节点错误记录：`knowledge/errors/control-node-list-load-failure.md`
+
 # 高风险区域
 - `common/global.d.ts`：共享类型漂移会同时影响前后端
 - `frontend/src/App.vue`、`InstanceWorkspace.vue`、`TerminalCore.vue`：容易引入整页重挂载或终端闪烁
+- `frontend/src/hooks/useControlPanelState.ts`：节点列表、target 加载、重试与错误透传集中在这里
+- `frontend/src/hooks/useControlPreviewState.ts`：preview 数据和真实 API 分流集中在这里
 - `daemon/src/service/monitor_service.ts`：心跳缓存、历史采样、进程指标和磁盘缓存集中在这里
 - `panel/src/app/routers/monitor_router.ts`：聚合多个远程节点数据，改动会影响整个监控页
 - `mcsm-monitor-plugin/`：Java 8、Spigot 1.12.2 兼容要求严格

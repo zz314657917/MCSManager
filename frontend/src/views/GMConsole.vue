@@ -2,6 +2,7 @@
 import GmOperationsPanel from "@/components/gm/GmOperationsPanel.vue";
 import GmServerPlayerSidebar from "@/components/gm/GmServerPlayerSidebar.vue";
 import { OPERATIONS_MOBILE_NAV_ITEMS } from "@/components/operations/mobileNav";
+import OperationsMobileNav from "@/components/operations/OperationsMobileNav.vue";
 import OperationsPageShell from "@/components/operations/OperationsPageShell.vue";
 import { useGmConsoleState } from "@/hooks/useGmConsoleState";
 import { useGmConsolePreviewState } from "@/hooks/useGmConsolePreviewState";
@@ -24,6 +25,7 @@ const router = useRouter();
 const { state: appState } = useAppStateStore();
 const chatBodyRef = ref<HTMLDivElement>();
 const operationsDrawerOpen = ref(false);
+const shellRef = ref<InstanceType<typeof OperationsPageShell>>();
 
 const isLocalPreviewMode = appState.userInfo?.token === "local-preview-token";
 const gmState = isLocalPreviewMode ? useGmConsolePreviewState() : useGmConsoleState();
@@ -165,6 +167,7 @@ watch(
     :data-page-mode="isChatPage ? 'chat' : 'manage'"
   >
     <OperationsPageShell
+      ref="shellRef"
       :title="pageTitle"
       :eyebrow="pageEyebrow"
       :back-label="backLabel"
@@ -174,6 +177,8 @@ watch(
       mobile-body-padding-bottom="12px"
       :mobile-nav-items="OPERATIONS_MOBILE_NAV_ITEMS"
       :hide-desktop-header="true"
+      :hide-mobile-header="true"
+      :hide-eyebrow-on-mobile="true"
     >
       <template #header-actions="{ isPhone: shellIsPhone }">
         <template v-if="!shellIsPhone">
@@ -389,6 +394,12 @@ watch(
         </section>
       </div>
     </OperationsPageShell>
+
+    <OperationsMobileNav
+      v-if="shellRef?.isPhone && OPERATIONS_MOBILE_NAV_ITEMS.length"
+      :items="OPERATIONS_MOBILE_NAV_ITEMS"
+      class="gm-console__mobile-nav"
+    />
 
     <a-drawer
       v-if="isPhone"
@@ -852,5 +863,13 @@ watch(
     width: 100%;
     max-width: 100%;
   }
+}
+
+.gm-console__mobile-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
 }
 </style>

@@ -69,4 +69,10 @@ const items = computed<BreadcrumbItem[]>(() => {
   align-items: center;
   padding: 20px 0px;
 }
+
+@media (max-width: 992px) {
+  .breadcrumbs {
+    display: none;
+  }
+}
 </style>

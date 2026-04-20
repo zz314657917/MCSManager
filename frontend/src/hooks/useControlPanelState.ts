@@ -19,7 +19,10 @@ import {
   collectDaemonIdsToHydrate,
   createControlLogLine,
   createControlTargetKey,
+  executeControlRequestWithRetry,
+  isRetriableControlRequestError,
   normalizeControlOutputLog,
+  resolveControlRequestErrorText,
   splitControlOutputLog,
   trimControlLogLines
 } from "@/tools/control";
@@ -61,29 +64,6 @@ const sortRemoteNodes = (a: RemoteNodeRecord, b: RemoteNodeRecord) => {
     return a.available ? -1 : 1;
   }
   return buildNodeDisplayName(a).localeCompare(buildNodeDisplayName(b));
-};
-
-const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  return String(error ?? "");
-};
-
-const resolveControlErrorText = (error: unknown, fallbackText: string) => {
-  const message = getErrorMessage(error).trim();
-  const lowerMessage = message.toLowerCase();
-
-  if (lowerMessage.includes("403")) return t("TXT_CODE_CONTROL_FORBIDDEN");
-  if (lowerMessage.includes("500")) return t("TXT_CODE_CONTROL_SERVER_ERROR");
-  if (
-    lowerMessage.includes("network error") ||
-    lowerMessage.includes("failed to fetch") ||
-    lowerMessage.includes("econnrefused") ||
-    lowerMessage.includes("timeout")
-  ) {
-    return t("TXT_CODE_CONTROL_NETWORK_ERROR");
-  }
-
-  return message || fallbackText;
 };
 
 const buildOutputLogLines = (rawOutput: string) => {
@@ -253,7 +233,11 @@ export function useControlPanelState() {
       appendErrorLog?: boolean;
     }
   ) => {
-    const text = resolveControlErrorText(error, options.fallbackText);
+    const text = resolveControlRequestErrorText(error, options.fallbackText, {
+      forbiddenText: t("TXT_CODE_CONTROL_FORBIDDEN"),
+      serverErrorText: t("TXT_CODE_CONTROL_SERVER_ERROR"),
+      networkErrorText: t("TXT_CODE_CONTROL_NETWORK_ERROR")
+    });
     if (options.appendErrorLog !== false && options.target) {
       appendLog(options.target, "error", text);
     }
@@ -439,19 +423,30 @@ export function useControlPanelState() {
 
   const loadNodes = async (forceRequest = false, showToastOnError = true) => {
     try {
-      const response = await remoteNodeList().execute({ forceRequest });
+      const response = await executeControlRequestWithRetry(
+        (requestForce) => remoteNodeList().execute({ forceRequest: requestForce }),
+        {
+          forceRequest,
+          shouldRetry: isRetriableControlRequestError
+        }
+      );
       applyRemoteNodes((response.value || []) as RemoteNodeRecord[]);
       if (!nodes.value.length && showToastOnError) {
         reportErrorMsg(new Error(t("TXT_CODE_CONTROL_NO_NODES")));
       }
-      return true;
+      return {
+        ok: true as const
+      };
     } catch (error) {
-      reportControlError(error, {
+      const text = reportControlError(error, {
         fallbackText: t("TXT_CODE_CONTROL_LOAD_NODES_FAILED"),
         showToast: showToastOnError,
         appendErrorLog: false
       });
-      return false;
+      return {
+        ok: false as const,
+        errorText: text
+      };
     }
   };
 
@@ -671,9 +666,9 @@ export function useControlPanelState() {
 
     isRefreshing.value = true;
     try {
-      const nodeLoaded = await loadNodes(true, false);
-      if (!nodeLoaded) {
-        reportErrorMsg(new Error(t("TXT_CODE_CONTROL_LOAD_NODES_FAILED")));
+      const nodeLoadResult = await loadNodes(true, false);
+      if (!nodeLoadResult.ok) {
+        reportErrorMsg(new Error(nodeLoadResult.errorText || t("TXT_CODE_CONTROL_LOAD_NODES_FAILED")));
         return;
       }
 
@@ -1018,8 +1013,8 @@ export function useControlPanelState() {
   );
 
   onMounted(async () => {
-    const loaded = await loadNodes(false, true);
-    if (!loaded || !nodes.value.length) return;
+    const nodeLoadResult = await loadNodes(false, true);
+    if (!nodeLoadResult.ok || !nodes.value.length) return;
 
     if (!selectedDaemonId.value) {
       selectedDaemonId.value = nodes.value[0].daemonId;
@@ -1053,8 +1048,8 @@ export function useControlPanelState() {
     if (target.mode === "global" && target.status !== INSTANCE_STATUS_CODE.RUNNING) {
       void (async () => {
         if (!daemonId) return;
-        const nodeLoaded = await loadNodes(true, false);
-        if (!nodeLoaded) return;
+        const nodeLoadResult = await loadNodes(true, false);
+        if (!nodeLoadResult.ok) return;
         await loadTargetsForDaemon(daemonId, {
           forceRequest: true,
           showToastOnError: true

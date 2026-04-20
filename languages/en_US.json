@@ -3497,5 +3497,25 @@
   "TXT_CODE_PLAYERS_STEP_QQ": "Bind QQ",
   "TXT_CODE_PLAYERS_STEP_CODE": "Request Role Code",
   "TXT_CODE_PLAYERS_STEP_CONFIRM": "Confirm In-Game",
-  "TXT_CODE_PLAYERS_ADMIN": "Admin Direct"
+  "TXT_CODE_PLAYERS_ADMIN": "Admin Direct",
+  "TXT_CODE_CONTROL_CONFIRM_STOP": "Confirm Action",
+  "TXT_CODE_CONTROL_CONFIRM_CLOSE_HOST": "Confirm to close host terminal?",
+  "TXT_CODE_CONTROL_CONFIRM_STOP_INSTANCE": "Confirm to stop current instance?",
+  "TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE": "Are you sure you want to restart the current instance?",
+  "TXT_CODE_GM_MANAGEMENT": "GM Management",
+  "TXT_CODE_CONTROL_INSTANCE_PAGE": "Instance Page",
+  "TXT_CODE_CONTROL_TERMINAL_OUTPUT": "Output",
+  "TXT_CODE_CONTROL_TERMINAL_POLL_INTERVAL": "Poll interval: {interval}ms",
+  "TXT_CODE_CONTROL_SEARCH_LOGS": "Search logs...",
+  "TXT_CODE_CONTROL_FILTER_ALL": "All",
+  "TXT_CODE_CONTROL_FILTER_ERROR": "Errors",
+  "TXT_CODE_CONTROL_FILTER_WARN": "Warnings",
+  "TXT_CODE_CONTROL_FILTER_COMMAND": "Commands",
+  "TXT_CODE_CONTROL_SEND_COMMAND": "Send",
+  "TXT_CODE_CONTROL_OPERATION_PENDING": "Operation in progress...",
+  "TXT_CODE_CONTROL_OPERATION_SUCCESS": "Operation completed",
+  "TXT_CODE_CONTROL_OPERATION_FAILED": "Operation failed: {error}",
+  "TXT_CODE_CONTROL_KEYBOARD_HINT": "Press Enter to send, up/down for history"
+,
+  "TXT_CODE_CONTROL_ADVANCED_TERMINAL": "Advanced Terminal"
 }

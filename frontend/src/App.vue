@@ -40,12 +40,19 @@ const designModeNavStyle = computed(() => {
 const useTopNavOnDesktop = computed(
   () => !isPhone.value && route.meta.desktopChromeMode === "top-nav"
 );
-const isMinimalChrome = computed(() => route.meta.chromeMode === "minimal" && !useTopNavOnDesktop.value);
+const isMobileMinimalChrome = computed(
+  () => isPhone.value && route.meta.mobileChromeMode === "minimal"
+);
+const isMinimalChrome = computed(() =>
+  isPhone.value
+    ? isMobileMinimalChrome.value
+    : route.meta.chromeMode === "minimal" && !useTopNavOnDesktop.value
+);
 const showSidebarLayoutChrome = computed(
   () => useSidebarLayout.value && !isMinimalChrome.value && !useTopNavOnDesktop.value
 );
 const showAppHeader = computed(() => !showSidebarLayoutChrome.value && !isMinimalChrome.value);
-const showBreadcrumbs = computed(() => !isMinimalChrome.value);
+const showBreadcrumbs = computed(() => !isMinimalChrome.value && !useTopNavOnDesktop.value);
 const showBottomNav = computed(
   () => isPhone.value && !showSidebarLayoutChrome.value && !isMinimalChrome.value
 );
