@@ -64,7 +64,7 @@ import {
   UsergroupDeleteOutlined,
   UsbOutlined
 } from "@ant-design/icons-vue";
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -635,7 +635,19 @@ const handleRestartCurrentTarget = () => {
 
   Modal.confirm({
     title: t("TXT_CODE_77cc12da"),
-    content: t("TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE"),
+    content: h("div", { style: "display:flex;flex-direction:column;gap:8px;" }, [
+      h("div", t("TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE")),
+      h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;align-items:center;" }, [
+        h("span", "实例："),
+        h(
+          "strong",
+          {
+            style: "color:#ff4d4f;font-weight:700;word-break:break-all;"
+          },
+          currentTargetTitle.value
+        )
+      ])
+    ]),
     okText: t("TXT_CODE_77cc12da"),
     cancelText: t("TXT_CODE_a0451c97"),
     async onOk() {
