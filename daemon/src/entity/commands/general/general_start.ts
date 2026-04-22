@@ -4,9 +4,10 @@ import fs from "fs-extra";
 import { killProcess } from "mcsmanager-common";
 import { $t } from "../../../i18n";
 import logger from "../../../service/log";
+import { killLinuxProcessTree } from "../../../service/process_tree";
 import { getRunAsUserParams } from "../../../tools/system_user";
 import Instance from "../../instance/instance";
-import { IInstanceProcess } from "../../instance/interface";
+import { IInstanceProcess, IInstanceProcessRuntimeState } from "../../instance/interface";
 import { commandStringToArray } from "../base/command_parser";
 import AbsStartCommand from "../start";
 
@@ -20,13 +21,26 @@ class StartupError extends Error {
 // Docker process adapter
 class ProcessAdapter extends EventEmitter implements IInstanceProcess {
   pid?: number | string;
+  rootPid?: number | string;
 
   constructor(private process: ChildProcess) {
     super();
     this.pid = this.process.pid;
+    this.rootPid = this.process.pid;
     process.stdout?.on("data", (text) => this.emit("data", text));
     process.stderr?.on("data", (text) => this.emit("data", text));
     process.on("exit", (code) => this.emit("exit", code));
+  }
+
+  public getRuntimeState(): IInstanceProcessRuntimeState {
+    const alive = this.process?.exitCode === null;
+    return {
+      pid: this.pid,
+      rootPid: this.rootPid,
+      childPid: this.pid,
+      sessionAlive: alive,
+      healthy: alive
+    };
   }
 
   public write(data?: string) {
@@ -34,6 +48,9 @@ class ProcessAdapter extends EventEmitter implements IInstanceProcess {
   }
 
   public kill(s?: any) {
+    if (process.platform === "linux" && this.rootPid) {
+      return killLinuxProcessTree(this.rootPid, s || "SIGKILL");
+    }
     if (this.pid) return killProcess(this.pid, this.process, s);
   }
 
@@ -51,8 +68,12 @@ class ProcessAdapter extends EventEmitter implements IInstanceProcess {
     this.process?.stdout?.destroy();
     this.process?.stderr?.destroy();
     if (this.process?.exitCode === null) {
-      this.process.kill("SIGTERM");
-      this.process.kill("SIGKILL");
+      if (process.platform === "linux" && this.rootPid) {
+        killLinuxProcessTree(this.rootPid, "SIGKILL");
+      } else {
+        this.process.kill("SIGTERM");
+        this.process.kill("SIGKILL");
+      }
     }
   }
 }

@@ -10,9 +10,13 @@ import { v4 } from "uuid";
 import { PTY_PATH } from "../../../const";
 import { $t } from "../../../i18n";
 import logger from "../../../service/log";
+import {
+  inspectLinuxPtyProcess,
+  killLinuxProcessTree
+} from "../../../service/process_tree";
 import { getRunAsUserParams } from "../../../tools/system_user";
 import Instance from "../../instance/instance";
-import { IInstanceProcess } from "../../instance/interface";
+import { IInstanceProcess, IInstanceProcessRuntimeState } from "../../instance/interface";
 import { commandStringToArray } from "../base/command_parser";
 import FunctionDispatcher from "../dispatcher";
 import AbsStartCommand from "../start";
@@ -35,19 +39,45 @@ const GO_PTY_MSG_TYPE = {
 // process adapter
 export class GoPtyProcessAdapter extends EventEmitter implements IInstanceProcess {
   private pipeClient?: Writable;
+  private healthCheckTask?: NodeJS.Timeout;
+  private runtimeState: IInstanceProcessRuntimeState;
+  private exitEmitted = false;
 
   constructor(
     private readonly process: ChildProcess,
-    public readonly pid: number,
+    public readonly childPid: number,
     public readonly pipeName: string
   ) {
     super();
+    this.rootPid = process.pid;
+    this.runtimeState = {
+      pid: childPid,
+      rootPid: this.rootPid,
+      childPid,
+      healthy: true,
+      sessionAlive: true
+    };
     process.stdout?.on("data", (text) => this.emit("data", text));
     process.stderr?.on("data", (text) => this.emit("data", text));
-    process.on("exit", (code) => this.emit("exit", code));
+    process.on("exit", (code) => this.notifyExit(code));
     setTimeout(() => {
       this.initNamedPipe();
     }, 1000);
+    this.startHealthCheck();
+  }
+
+  public readonly rootPid?: number;
+
+  public get pid() {
+    return this.runtimeState.pid ?? this.childPid ?? this.rootPid;
+  }
+
+  public getRuntimeState(): IInstanceProcessRuntimeState {
+    return {
+      ...this.runtimeState,
+      rootPid: this.rootPid,
+      childPid: this.childPid
+    };
   }
 
   private async initNamedPipe() {
@@ -63,6 +93,36 @@ export class GoPtyProcessAdapter extends EventEmitter implements IInstanceProces
     } catch (error) {
       logger.warn("Start PTY Pipe error, This maybe is not a bug:", this.pipeName, error);
     }
+  }
+
+  private startHealthCheck() {
+    if (process.platform !== "linux" || !this.rootPid) return;
+    this.healthCheckTask = setInterval(() => {
+      const snapshot = inspectLinuxPtyProcess(this.rootPid, this.childPid);
+      this.runtimeState = snapshot;
+
+      if (!snapshot.healthy && this.process.exitCode === null) {
+        logger.warn(
+          `PTY instance process unhealthy. rootPid=${this.rootPid}, childPid=${this.childPid}, rootState=${snapshot.rootState}, childState=${snapshot.childState}`
+        );
+        killLinuxProcessTree(this.rootPid, "SIGKILL");
+        this.notifyExit(0);
+      }
+    }, 2000);
+
+    if (typeof this.healthCheckTask.unref === "function") {
+      this.healthCheckTask.unref();
+    }
+  }
+
+  private notifyExit(code?: number | null) {
+    if (this.exitEmitted) return;
+    this.exitEmitted = true;
+    if (this.healthCheckTask) {
+      clearInterval(this.healthCheckTask);
+      this.healthCheckTask = undefined;
+    }
+    this.emit("exit", code ?? 0);
   }
 
   public resize(w: number, h: number) {
@@ -86,10 +146,17 @@ export class GoPtyProcessAdapter extends EventEmitter implements IInstanceProces
   }
 
   public kill(s?: any) {
-    return killProcess(this.pid, this.process, s);
+    if (process.platform === "linux" && this.rootPid) {
+      return killLinuxProcessTree(this.rootPid, s || "SIGKILL");
+    }
+    return killProcess(this.childPid, this.process, s);
   }
 
   public async destroy() {
+    if (this.healthCheckTask) {
+      clearInterval(this.healthCheckTask);
+      this.healthCheckTask = undefined;
+    }
     for (const n of this.eventNames()) this.removeAllListeners(n);
     if (this.process.stdout)
       for (const eventName of this.process.stdout.eventNames())
@@ -107,8 +174,12 @@ export class GoPtyProcessAdapter extends EventEmitter implements IInstanceProces
     this.process?.stdout?.destroy();
     this.process?.stderr?.destroy();
     if (this.process?.exitCode === null) {
-      this.process.kill("SIGTERM");
-      this.process.kill("SIGKILL");
+      if (process.platform === "linux" && this.rootPid) {
+        killLinuxProcessTree(this.rootPid, "SIGKILL");
+      } else {
+        this.process.kill("SIGTERM");
+        this.process.kill("SIGKILL");
+      }
     }
     fs.remove(this.pipeName, (err) => {});
   }
@@ -251,7 +322,7 @@ export default class PtyStartCommand extends AbsStartCommand {
     const ptySubProcessCfg = await this.readPtySubProcessConfig(subProcess);
     const processAdapter = new GoPtyProcessAdapter(subProcess, ptySubProcessCfg.pid, pipeName);
 
-    if (subProcess.exitCode !== null || processAdapter.pid == null || processAdapter.pid === 0) {
+    if (subProcess.exitCode !== null || processAdapter.childPid == null || processAdapter.childPid === 0) {
       instance.println(
         "ERROR",
         $t("TXT_CODE_pty_start.pidErr", {
@@ -269,7 +340,7 @@ export default class PtyStartCommand extends AbsStartCommand {
     logger.info(
       $t("TXT_CODE_pty_start.startSuccess", {
         instanceUuid: instance.instanceUuid,
-        pid: ptySubProcessCfg.pid
+        pid: processAdapter.rootPid
       })
     );
     instance.println("INFO", $t("TXT_CODE_b50ffba8"));

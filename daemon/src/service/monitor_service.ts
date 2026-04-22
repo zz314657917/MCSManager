@@ -56,6 +56,17 @@ interface IMonitorInstanceLike {
   };
   process?: {
     pid?: number | string;
+    rootPid?: number | string;
+    childPid?: number | string;
+    getRuntimeState?: () => {
+      pid?: number | string;
+      rootPid?: number | string;
+      childPid?: number | string;
+      rootState?: string;
+      childState?: string;
+      sessionAlive?: boolean;
+      healthy?: boolean;
+    };
   };
   status(): number;
   absoluteCwdPath(): string;
@@ -193,6 +204,8 @@ export class MonitorService {
   }
 
   private isProcessRunning(instance: IMonitorInstanceLike) {
+    const runtimeState = instance.process?.getRuntimeState?.();
+    if (runtimeState?.healthy === false) return false;
     return instance.status() === INSTANCE_STATUS_RUNNING;
   }
 
@@ -347,13 +360,21 @@ export class MonitorService {
   private buildProcessSnapshot(instance: IMonitorInstanceLike): IMcsmMonitorProcessSnapshot {
     if (!this.isProcessRunning(instance)) return {};
 
+    const runtimeState = instance.process?.getRuntimeState?.();
+    const monitorPid = runtimeState?.pid ?? instance.process?.pid;
     const processSnapshot =
       this.processSnapshotMap.get(instance.instanceUuid) ??
-      this.processMonitorRef.sample(instance.process?.pid);
+      this.processMonitorRef.sample(monitorPid);
     this.processSnapshotMap.set(instance.instanceUuid, processSnapshot);
 
     return {
-      pid: processSnapshot.pid,
+      pid: runtimeState?.pid ?? processSnapshot.pid,
+      rootPid: runtimeState?.rootPid,
+      childPid: runtimeState?.childPid,
+      rootState: runtimeState?.rootState,
+      childState: runtimeState?.childState,
+      sessionAlive: runtimeState?.sessionAlive,
+      healthy: runtimeState?.healthy,
       cpuPercent: processSnapshot.cpuPercent,
       memoryBytes: processSnapshot.memoryBytes,
       memoryPercent: processSnapshot.memoryPercent

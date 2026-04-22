@@ -3,6 +3,7 @@ import os from "os";
 
 export interface IProcessRuntimeSnapshot {
   pid?: number | string;
+  state?: string;
   cpuPercent?: number;
   memoryBytes?: number;
   memoryPercent?: number;
@@ -46,6 +47,7 @@ class LinuxProcessMonitor {
 
       return {
         pid: numericPid,
+        state: statTokens[0] || "",
         cpuPercent: Number(cpuPercent.toFixed(1)),
         memoryBytes,
         memoryPercent: Number(((memoryBytes / os.totalmem()) * 100).toFixed(1))

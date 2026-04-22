@@ -235,6 +235,12 @@ declare global {
 
   interface IMcsmMonitorProcessSnapshot {
     pid?: number | string;
+    rootPid?: number | string;
+    childPid?: number | string;
+    rootState?: string;
+    childState?: string;
+    sessionAlive?: boolean;
+    healthy?: boolean;
     cpuPercent?: number;
     memoryBytes?: number;
     memoryPercent?: number;

@@ -8,6 +8,17 @@ export default class GeneralStopCommand extends InstanceCommand {
   }
 
   async exec(instance: Instance) {
+    const runtimeState = instance.process?.getRuntimeState?.();
+    if (runtimeState?.healthy === false && instance.process) {
+      instance.println(
+        "WARN",
+        `Detected unhealthy PTY runtime, forcing process tree cleanup for ${instance.config.nickname}.`
+      );
+      instance.ignoreEventTaskOnce();
+      instance.process.kill("SIGKILL");
+      return instance;
+    }
+
     const stopCommand = instance.config.stopCommand;
     if (instance.status() === Instance.STATUS_STOP || !instance.process)
       return instance.failure(new Error($t("TXT_CODE_general_stop.notRunning")));

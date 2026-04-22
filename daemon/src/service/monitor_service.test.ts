@@ -54,7 +54,16 @@ function createMockInstance(instanceUuid: string, status: number, pid = 1234): a
       memoryUsage: 0
     },
     process: {
-      pid
+      pid,
+      getRuntimeState() {
+        return {
+          pid,
+          rootPid: pid,
+          childPid: pid,
+          healthy: true,
+          sessionAlive: true
+        };
+      }
     },
     status(nextStatus?: number) {
       if (nextStatus != null) currentStatus = nextStatus;
@@ -140,6 +149,24 @@ assert.equal(staleSnapshot.plugin.tps.oneMin, 0);
 history = (service as any).historyMap.get(instance.instanceUuid)?.toArray() ?? [];
 assert.equal(history.at(-1)?.onlinePlayers, 0);
 assert.equal(history.at(-1)?.tps, 0);
+
+instance.process = {
+  pid: 4321,
+  getRuntimeState() {
+    return {
+      pid: undefined,
+      rootPid: 4320,
+      childPid: 4321,
+      rootState: "S",
+      childState: "Z",
+      healthy: false,
+      sessionAlive: false
+    };
+  }
+};
+const zombieSnapshot = service.buildServerSnapshot(instance as any);
+assert.equal(zombieSnapshot.processRunning, false);
+assert.deepEqual(zombieSnapshot.process, {});
 
 instance.status(STATUS_STOP);
 instance.process = undefined;
