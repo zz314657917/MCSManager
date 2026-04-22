@@ -16,6 +16,25 @@ import { systemConfig } from "../setting";
 
 const router = new Router({ prefix: "/protected_instance" });
 
+async function appendActualInstanceState(
+  remoteService: any,
+  instanceUuid: string,
+  result: any
+) {
+  try {
+    const detail = await new RemoteRequest(remoteService).request("instance/detail", {
+      instanceUuid
+    });
+    return {
+      ...result,
+      actualStatus: detail?.status,
+      actualInstance: detail
+    };
+  } catch {
+    return result;
+  }
+}
+
 // Routing permission verification middleware
 router.use(async (ctx, next) => {
   const instanceUuid = String(ctx.query.uuid);
@@ -82,7 +101,7 @@ router.all(
         operator_name: ctx.session?.["userName"],
         instance_name: result?.instances?.[0]?.nickname
       });
-      ctx.body = result;
+      ctx.body = await appendActualInstanceState(remoteService, instanceUuid, result);
     } catch (err) {
       ctx.body = err;
     }
@@ -134,7 +153,7 @@ router.all(
         operator_name: ctx.session?.["userName"],
         instance_name: result?.instances?.[0]?.nickname
       });
-      ctx.body = result;
+      ctx.body = await appendActualInstanceState(remoteService, instanceUuid, result);
     } catch (err) {
       ctx.body = err;
     }
@@ -162,7 +181,7 @@ router.all(
         operator_name: ctx.session?.["userName"],
         instance_name: result?.instances?.[0]?.nickname
       });
-      ctx.body = result;
+      ctx.body = await appendActualInstanceState(remoteService, instanceUuid, result);
     } catch (err) {
       ctx.body = err;
     }

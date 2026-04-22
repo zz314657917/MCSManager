@@ -110,6 +110,7 @@ export default class Instance extends EventEmitter {
 
   private outputLoopTask?: NodeJS.Timeout;
   private outputBuffer: CircularBuffer<string>;
+  private runtimeStateReconciliating = false;
 
   // When initializing an instance, the instance must be initialized through uuid and configuration class, otherwise the instance will be unavailable
   constructor(instanceUuid: string, config: InstanceConfig) {
@@ -343,7 +344,37 @@ export default class Instance extends EventEmitter {
   // set instance state or get state
   status(v?: number) {
     if (v != null) this.instanceStatus = v;
+    else this.reconcileProcessRuntimeState();
     return this.instanceStatus;
+  }
+
+  private reconcileProcessRuntimeState() {
+    if (this.runtimeStateReconciliating) return;
+    if (this.instanceStatus === Instance.STATUS_STOP) return;
+    if (!this.process) {
+      this.instanceStatus = Instance.STATUS_STOP;
+      return;
+    }
+
+    const runtimeState = this.process.getRuntimeState?.();
+    if (runtimeState?.healthy !== false) return;
+
+    this.runtimeStateReconciliating = true;
+    try {
+      logger.warn(
+        `Instance ${this.config.nickname} (${this.instanceUuid}) runtime became unhealthy. rootPid=${runtimeState.rootPid}, childPid=${runtimeState.childPid}, rootState=${runtimeState.rootState}, childState=${runtimeState.childState}`
+      );
+      try {
+        this.process.kill("SIGKILL");
+      } catch (error) {
+        logger.warn(
+          `Instance ${this.config.nickname} (${this.instanceUuid}) cleanup failed: ${error}`
+        );
+      }
+      this.stopped(0);
+    } finally {
+      this.runtimeStateReconciliating = false;
+    }
   }
 
   // function that must be executed after the instance starts

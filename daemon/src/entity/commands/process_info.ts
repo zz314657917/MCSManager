@@ -17,8 +17,9 @@ export default class ProcessInfoCommand extends InstanceCommand {
       elapsed: 0, // ms since the start of the process
       timestamp: 0 // ms since epoch
     };
-    if (instance.process && instance.process.pid) {
-      info = await pidusage(instance.process.pid);
+    const runtimePid = instance.process?.getRuntimeState?.().pid ?? instance.process?.pid;
+    if (instance.process && runtimePid) {
+      info = await pidusage(runtimePid);
     }
     return info;
   }
