@@ -2,31 +2,32 @@
 title: Current Focus
 type: status
 repo: MCSManager-monitor
-last_verified: 2026-04-20
+last_verified: 2026-04-24
 ---
 
 # 当前默认关注点
-- 保持监控 v1 链路稳定：插件上报 -> daemon 聚合 -> panel 汇总 -> frontend 展示
-- 修改监控字段时避免 `common/global.d.ts` 漏同步
-- 当前前端重点已扩展到 `control`、`gm`、`operations` 与 standalone preview，不再只是监控页
-- 修改前端交互时避免实例页、控制台页和监控页出现不必要的重挂载与闪烁
-- 控制台目标加载要兼顾“当前节点立即可用”和“其他在线节点后台补齐”，避免页面长期只剩默认 `Host Shell`
-- standalone preview 目前是前端调试和交互验证的重要入口；新增中量功能弹窗时优先考虑 preview/live 分流
-- 保持 Java 8 / Spigot 1.12.2 兼容
-- 保持 MCP server 只访问 panel API，不直连 daemon
 
-# 当前会话开始时建议先确认
-- 本次问题属于 monitor、control、gm、operations、plugin 还是 MCP
-- 是否涉及监控字段新增、删除或重命名，或者 control/GM 相关路由与 target 加载
-- 是否涉及 standalone preview、本地 preview 数据、弹窗 preview wrapper
-- 是否涉及部署脚本、远程节点地址、浏览器直连限制或 mixed content/WSS
-- 是否需要同步 README、配置说明或知识库
+- 继续把仓库视为“monitor + control + operations + MCP”的组合仓库，而不是只看旧 monitor 页面。
+- Daemon 侧这轮新增了 PTY 进程树探测、Linux 子进程回收和运行态同步，后续涉及实例启动/停止/终端时要优先检查这条链路。
+- 修改监控字段或实例运行态结构时，继续同步 `common/global.d.ts`、daemon、panel 和 frontend，避免状态漂移。
+- 前端仍要避免 query 变化导致整页重挂载；control/preview 路线继续优先走最小重建。
+- MCP server 继续保持“只访问 panel API，不直连 daemon”的边界。
 
-# 当前工作树里正在发生的主题
-- `frontend/src/views/ControlConsole.vue`、`frontend/src/views/GMConsole.vue`、`frontend/src/config/router.ts`、`frontend/src/hooks/useControlPanelState.ts`、`frontend/src/hooks/useControlPreviewState.ts` 仍有未提交改动
-- 当前未提交改动集中在 control/GM 页面、preview 行为、顶部导航和相关工具函数，不是单纯监控字段调整
-- `knowledge/errors/control-node-list-load-failure.md` 已新增，说明控制页节点列表加载失败已经形成可复用排障结论
+# 当前仓库事实
 
-# 当前任务记录位置
-- 进行中的问题写到 `knowledge/tasks/current-task.md`
-- 新发现的稳定结论回写到 `knowledge/errors/`、`knowledge/decisions/` 或模块笔记
+- 近两次提交已把工作重点从单纯监控扩到 PTY 实例进程树回收、状态同步和 control 交互修正。
+- `daemon/src/service/process_tree.ts` 现在集中封装 `/proc` 读取、僵尸进程识别、进程树构建和 Linux 子树 kill 逻辑。
+- `daemon/src/entity/commands/pty/pty_start.ts` 已把 PTY 健康检查、`rootPid/childPid` 运行态、异常时树级回收整合进 `GoPtyProcessAdapter`。
+- 当前仓库没有再保留 `knowledge/tasks/current-task.md`，后续临时任务不要默认重建成分支日志；更适合把稳定结论落到模块笔记、错误页或决策页。
+
+# 接手时先判断问题落在哪
+
+- 监控数据链路：plugin -> daemon -> panel -> frontend
+- control / instance 操作：panel router、frontend control 页面、daemon 实例命令
+- PTY / 终端问题：`pty_start.ts`、`process_tree.ts`、实例运行态接口
+- MCP / AstrBot：`mcsmanager-mcp-server/` 与 panel API 边界
+
+# 记录原则
+
+- 当前关注点只保留稳定方向和高复用边界，不记录分支名、工作树或临时任务状态。
+- 新发现的稳定结论优先写到 `knowledge/daemon/`、`knowledge/errors/` 或 `knowledge/decisions/`，不要把实现细节堆回 `AGENTS.md`。

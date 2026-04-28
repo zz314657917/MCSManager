@@ -22,12 +22,10 @@ last_verified: 2026-04-20
 - `03-build-and-verify.md`：构建与验证
 - `04-monitor-architecture.md`：监控链路
 - `05-known-pitfalls.md`：易踩坑
-- `06-deploy-conventions.md`：部署约定
 - `07-current-focus.md`：当前关注点
 - `frontend/`、`panel/`、`daemon/`、`plugin/`、`mcp/`：模块笔记
 - `errors/`：错误与排查记录
 - `decisions/`：决策记录
-- `tasks/`：当前任务状态
 
 # 当前更常用的入口
 - 监控链路：`knowledge/04-monitor-architecture.md`
@@ -35,4 +33,3 @@ last_verified: 2026-04-20
 - standalone preview：`knowledge/frontend/standalone-preview.md`
 - 浏览器直连 daemon / mixed content：`knowledge/errors/browser-daemon-direct-connect.md`、`knowledge/errors/mixed-content-wss.md`
 - control 节点列表加载失败：`knowledge/errors/control-node-list-load-failure.md`
-- 当前进行中的工作：`knowledge/tasks/current-task.md`

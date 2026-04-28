@@ -14,11 +14,10 @@
 - `mcsm-monitor-plugin/`：Minecraft/Spigot 监控插件，Java 8，目标 Spigot API 1.12.2。
 - `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 18+，用于安全查询和操作实例。
 
-当前仓库远端约定：
+远端协作约定：
 
-- `origin` 指向官方仓库 `MCSManager/MCSManager`，默认不要直接 push。
-- `zzrepo` 指向用户仓库 `zz314657917/MCSManager`，当前监控改造分支通常是 `codex/mcsm-monitor-deploy`。
-- 发布本项目改动前先确认当前分支和上游，避免把本地实验内容推到官方远端。
+- 如果本地同时挂了上游仓库和个人 fork，发布前先确认当前分支与 push 目标。
+- 默认不要把实验性改动直接推到官方上游。
 
 监控功能的主要链路：
 
@@ -34,8 +33,7 @@
 - 监控 v1 不依赖 Prometheus/Grafana，面板通过 `/api/monitor/servers` 聚合当前状态。
 - 每台游戏主机运行 MCSManager daemon；面板机运行 panel/frontend，通过远程节点连接 daemon。
 - 1.12.2 服务端安装 `mcsm-monitor-plugin`，插件向本机 daemon 的 `/v1/plugin/heartbeat` 上报 TPS、人数和主线程状态。
-- Linux 部署脚本在 `prod-scripts/linux/`；`deploy-monitor-daemon-from-repo.sh` 要求目标机已有官方 `/opt/mcsmanager/daemon` 基础安装。
-- 服务器上常见约定路径：源码仓库 `/root/MCSManager-monitor`，线上运行目录 `/opt/mcsmanager`。
+- Linux 部署脚本在 `prod-scripts/linux/`；目标机需要先完成官方 MCSManager 基础安装。
 
 ## AI 知识库约定
 
@@ -57,7 +55,6 @@
 - Minecraft 插件：`knowledge/plugin/`
 - MCP server：`knowledge/mcp/`
 - 报错、异常、兼容性问题：`knowledge/errors/`
-- 当前进行中的问题：`knowledge/tasks/current-task.md`
 
 当本次修改形成稳定结论、固定模式、已确认踩坑或重要设计取舍时，应回写到 `knowledge/`，而不是只留在对话历史中。
 不要把大段知识正文继续堆到 `AGENTS.md`；`AGENTS.md` 保持入口、约束和索引，细节放入知识库。
