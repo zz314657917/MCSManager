@@ -39,6 +39,9 @@ const { isPhone } = useScreen();
 const useWideDesktopHeader = computed(
   () => !isPhone.value && route.meta.desktopChromeMode === "top-nav"
 );
+const desktopHeaderMenus = computed(() => {
+  return menus.value.filter((item) => item.path !== "/instances");
+});
 
 const openPhoneMenu = (b = false) => {
   containerState.showPhoneMenu = b;
@@ -60,7 +63,7 @@ const openPhoneMenu = (b = false) => {
         </a>
 
         <div
-          v-for="item in menus"
+          v-for="item in desktopHeaderMenus"
           :key="item.path"
           class="nav-button"
           :class="[item.customClass, { 'nav-button-active': isRouteActive(item.path) }]"

@@ -14,6 +14,8 @@ export interface ControlTarget {
   instanceType?: string;
 }
 
+export type ControlBatchAction = "start" | "stop" | "restart" | "kill";
+
 export interface ControlLogLine {
   id: string;
   time: string;

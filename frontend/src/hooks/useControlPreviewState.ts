@@ -1,7 +1,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { INSTANCE_STATUS_CODE } from "@/types/const";
 import { CONTROL_POLL_INTERVAL_MS, createControlLogLine, createControlTargetKey, trimControlLogLines } from "@/tools/control";
-import type { ControlLogLine, ControlPreviewNode, ControlTarget } from "@/types/control";
+import type { ControlBatchAction, ControlLogLine, ControlPreviewNode, ControlTarget } from "@/types/control";
 
 export const CONTROL_PREVIEW_GLOBAL_TARGET_ID = "global0001";
 export const CONTROL_PREVIEW_POLL_INTERVAL_MS = CONTROL_POLL_INTERVAL_MS;
@@ -442,6 +442,46 @@ export function useControlPreviewState() {
     }, 240);
   };
 
+  const batchOperateTargets = async (action: ControlBatchAction, targets: ControlTarget[]) => {
+    const instanceTargets = targets.filter((target) => target.mode === "instance");
+    if (!instanceTargets.length) return false;
+
+    const statusMap: Record<ControlBatchAction, INSTANCE_STATUS_CODE> = {
+      start: INSTANCE_STATUS_CODE.STARTING,
+      stop: INSTANCE_STATUS_CODE.STOPPING,
+      restart: INSTANCE_STATUS_CODE.BUSY,
+      kill: INSTANCE_STATUS_CODE.BUSY
+    };
+    const doneStatusMap: Record<ControlBatchAction, INSTANCE_STATUS_CODE> = {
+      start: INSTANCE_STATUS_CODE.RUNNING,
+      stop: INSTANCE_STATUS_CODE.STOPPED,
+      restart: INSTANCE_STATUS_CODE.RUNNING,
+      kill: INSTANCE_STATUS_CODE.STOPPED
+    };
+    const labelMap: Record<ControlBatchAction, string> = {
+      start: "start",
+      stop: "stop",
+      restart: "restart",
+      kill: "terminate"
+    };
+
+    for (const target of instanceTargets) {
+      const targetKey = makeTargetKey(target);
+      if (!target.daemonAvailable) {
+        appendLog(target, "error", "节点离线，无法执行批量操作。");
+        continue;
+      }
+      updateTargetStatus(targetKey, statusMap[action]);
+      appendLogByKey(targetKey, action === "start" ? "info" : "warn", `[batch] ${labelMap[action]} ${target.displayName}`);
+      scheduleTask(() => {
+        updateTargetStatus(targetKey, doneStatusMap[action]);
+        appendLogByKey(targetKey, "info", `[batch] ${target.displayName} ${labelMap[action]} request sent.`);
+      }, 500);
+    }
+
+    return true;
+  };
+
   const sendCommand = () => {
     const target = currentTarget.value;
     const targetKey = currentTargetKey.value;
@@ -523,6 +563,7 @@ export function useControlPreviewState() {
     stopCurrentTarget,
     restartCurrentTarget,
     terminateCurrentTarget,
+    batchOperateTargets,
     sendCommand
   };
 }

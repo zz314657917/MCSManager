@@ -33,7 +33,9 @@ import {
   type ControlDesktopModalFeatureKey
 } from "@/tools/controlFeatureModal";
 import { getPreviewServerConfigFiles } from "@/tools/controlFeaturePreview";
-import type { ControlLogLine, ControlTarget } from "@/types/control";
+import { createControlTargetKey } from "@/tools/control";
+import { reportErrorMsg } from "@/tools/validator";
+import type { ControlBatchAction, ControlLogLine, ControlTarget } from "@/types/control";
 import type { InstanceDetail, LayoutCard } from "@/types";
 import EventConfig from "@/widgets/instance/dialogs/EventConfig.vue";
 import InstanceDetailDialog from "@/widgets/instance/dialogs/InstanceDetail.vue";
@@ -86,8 +88,11 @@ const mcPingSettingsDialog = ref<InstanceType<typeof McPingSettings>>();
 const instanceDetailDialog = ref<InstanceType<typeof InstanceDetailDialog>>();
 const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamentalDetail>>();
 const ALL_CONTROL_TARGETS_FILTER = "__all_control_targets__";
+const BATCH_OPERATION_DANGER_ACTIONS = new Set<ControlBatchAction>(["stop", "kill"]);
 const targetFilterDaemonId = ref(ALL_CONTROL_TARGETS_FILTER);
 const currentInstanceDetail = ref<InstanceDetail>();
+const batchSelectedTargetKeys = ref<string[]>([]);
+const isBatchOperating = ref(false);
 const activeFeatureModal = ref<{
   key: ControlDesktopModalFeatureKey;
   title: string;
@@ -134,6 +139,7 @@ const {
   stopCurrentTarget,
   restartCurrentTarget,
   terminateCurrentTarget,
+  batchOperateTargets,
   sendCommand
 } = controlState;
 const controlPlayerState = isLocalPreviewMode
@@ -251,6 +257,22 @@ const orderedCurrentTargets = computed(() => {
   return [...globalTargets, ...favoriteTargets, ...groupedTargets];
 });
 
+const batchSelectedTargetKeySet = computed(() => new Set(batchSelectedTargetKeys.value));
+const allTargets = computed(() => nodes.value.flatMap((node) => node.targets));
+const selectableBatchTargets = computed(() =>
+  allTargets.value.filter((target) => target.mode === "instance")
+);
+const batchSelectedTargets = computed(() => {
+  const selectedKeys = batchSelectedTargetKeySet.value;
+  return selectableBatchTargets.value.filter((target) => selectedKeys.has(createControlTargetKey(target)));
+});
+const batchOperationLabels: Record<ControlBatchAction, string> = {
+  start: t("TXT_CODE_8c7318b3"),
+  stop: t("TXT_CODE_148d6467"),
+  restart: t("TXT_CODE_77cc12da"),
+  kill: t("TXT_CODE_1c36c8f2")
+};
+
 const getLogClass = (line: ControlLogLine) => `terminal-line--${line.level}`;
 
 // Filtered logs based on search and level
@@ -296,6 +318,41 @@ const handleSelectTarget = (target: ControlTarget) => {
   if (isPhone.value) {
     closeMobileSelector();
   }
+};
+
+const handleToggleBatchSelection = (target: ControlTarget) => {
+  if (!isAdmin.value) return;
+  if (target.mode !== "instance") return;
+
+  const targetKey = createControlTargetKey(target);
+  if (batchSelectedTargetKeySet.value.has(targetKey)) {
+    batchSelectedTargetKeys.value = batchSelectedTargetKeys.value.filter((key) => key !== targetKey);
+    return;
+  }
+
+  batchSelectedTargetKeys.value = [...batchSelectedTargetKeys.value, targetKey];
+};
+
+const handleToggleVisibleBatchSelection = (targets: ControlTarget[]) => {
+  if (!isAdmin.value) return;
+  const selectableTargets = targets.filter((target) => target.mode === "instance");
+  if (!selectableTargets.length) return;
+
+  const selectedKeys = new Set(batchSelectedTargetKeys.value);
+  const visibleKeys = selectableTargets.map((target) => createControlTargetKey(target));
+  const allVisibleSelected = visibleKeys.every((key) => selectedKeys.has(key));
+
+  if (allVisibleSelected) {
+    for (const key of visibleKeys) selectedKeys.delete(key);
+  } else {
+    for (const key of visibleKeys) selectedKeys.add(key);
+  }
+
+  batchSelectedTargetKeys.value = [...selectedKeys];
+};
+
+const clearBatchSelection = () => {
+  batchSelectedTargetKeys.value = [];
 };
 
 const handleToggleFavoriteTarget = (target: ControlTarget) => {
@@ -656,6 +713,72 @@ const handleRestartCurrentTarget = () => {
   });
 };
 
+const runBatchOperation = async (action: ControlBatchAction, targets: ControlTarget[]) => {
+  if (!isAdmin.value) return;
+  if (isBatchOperating.value) return;
+  if (!targets.length) {
+    reportErrorMsg(new Error(t("TXT_CODE_CONTROL_BATCH_NO_SELECTION")));
+    return;
+  }
+
+  isBatchOperating.value = true;
+  try {
+    const ok = await batchOperateTargets(action, targets);
+    if (ok) {
+      clearBatchSelection();
+      void refreshDashboard(true);
+      void loadPlayers(true);
+    }
+  } finally {
+    isBatchOperating.value = false;
+  }
+};
+
+const handleBatchOperation = (action: ControlBatchAction) => {
+  if (!isAdmin.value) return;
+  const targets = batchSelectedTargets.value;
+  if (!targets.length) {
+    reportErrorMsg(new Error(t("TXT_CODE_CONTROL_BATCH_NO_SELECTION")));
+    return;
+  }
+
+  Modal.confirm({
+    title: t("TXT_CODE_CONTROL_BATCH_CONFIRM_TITLE", {
+      action: batchOperationLabels[action]
+    }),
+    content: h("div", { class: "control-console__batch-confirm" }, [
+      h(
+        "div",
+        t("TXT_CODE_CONTROL_BATCH_CONFIRM_CONTENT", {
+          action: batchOperationLabels[action],
+          count: targets.length
+        })
+      ),
+      h(
+        "div",
+        { class: "control-console__batch-confirm-list" },
+        targets.slice(0, 8).map((target) =>
+          h("span", { class: "control-console__batch-confirm-item" }, [
+            h("strong", getTargetNote(target) || target.displayName),
+            h("span", ` / ${target.daemonDisplayName}`)
+          ])
+        )
+      ),
+      targets.length > 8
+        ? h("div", { class: "control-console__batch-confirm-more" }, `+ ${targets.length - 8}`)
+        : null
+    ]),
+    okText: batchOperationLabels[action],
+    cancelText: t("TXT_CODE_a0451c97"),
+    okButtonProps: {
+      danger: BATCH_OPERATION_DANGER_ACTIONS.has(action)
+    },
+    async onOk() {
+      await runBatchOperation(action, targets);
+    }
+  });
+};
+
 const handleTerminateCurrentTarget = () => {
   if (currentTarget.value?.mode !== "instance") return;
 
@@ -703,6 +826,24 @@ watch(
   },
   { deep: true }
 );
+
+watch(
+  selectableBatchTargets,
+  (targets) => {
+    if (!isAdmin.value) {
+      batchSelectedTargetKeys.value = [];
+      return;
+    }
+
+    const validKeys = new Set(targets.map((target) => createControlTargetKey(target)));
+    batchSelectedTargetKeys.value = batchSelectedTargetKeys.value.filter((key) => validKeys.has(key));
+  },
+  { deep: true }
+);
+
+watch(isAdmin, (admin) => {
+  if (!admin) clearBatchSelection();
+});
 
 watch(
   () => currentTargetKey.value,
@@ -888,10 +1029,14 @@ onUnmounted(() => {
           :current-targets="orderedCurrentTargets"
           :current-target-key="currentTargetKey"
           :favorite-target-keys="favoriteTargetKeys"
+          :selected-target-keys="batchSelectedTargetKeys"
           :target-notes="targetNotes"
           :target-filter-daemon-id="targetFilterDaemonId"
           :all-targets-filter-value="ALL_CONTROL_TARGETS_FILTER"
+          :batch-selection-enabled="isAdmin"
           @select-target="handleSelectTarget"
+          @toggle-batch-selection="handleToggleBatchSelection"
+          @toggle-visible-batch-selection="handleToggleVisibleBatchSelection"
           @toggle-favorite="handleToggleFavoriteTarget"
           @change-target-filter="handleChangeTargetFilter"
           @edit-target-note="handleEditTargetNote"
@@ -1154,10 +1299,14 @@ onUnmounted(() => {
             :primary-action-label="primaryActionLabel"
             :mode-text="currentTargetModeText"
             :features="controlFeatureItems"
+            :batch-selected-count="batchSelectedTargets.length"
+            :batch-busy="isBatchOperating"
             @start="startCurrentTarget"
             @stop="handleStopCurrentTarget"
             @restart="handleRestartCurrentTarget"
             @terminate="handleTerminateCurrentTarget"
+            @batch-operation="handleBatchOperation"
+            @clear-batch-selection="clearBatchSelection"
           />
         </div>
       </div>
@@ -1201,10 +1350,14 @@ onUnmounted(() => {
         :current-targets="orderedCurrentTargets"
         :current-target-key="currentTargetKey"
         :favorite-target-keys="favoriteTargetKeys"
+        :selected-target-keys="batchSelectedTargetKeys"
         :target-notes="targetNotes"
         :target-filter-daemon-id="targetFilterDaemonId"
         :all-targets-filter-value="ALL_CONTROL_TARGETS_FILTER"
+        :batch-selection-enabled="isAdmin"
         @select-target="handleSelectTarget"
+        @toggle-batch-selection="handleToggleBatchSelection"
+        @toggle-visible-batch-selection="handleToggleVisibleBatchSelection"
         @toggle-favorite="handleToggleFavoriteTarget"
         @change-target-filter="handleChangeTargetFilter"
         @edit-target-note="handleEditTargetNote"
@@ -1982,6 +2135,33 @@ onUnmounted(() => {
 
 .control-console__player-modal-alert {
   margin-bottom: 14px;
+}
+
+.control-console__batch-confirm {
+  display: grid;
+  gap: 10px;
+}
+
+.control-console__batch-confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.control-console__batch-confirm-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.control-console__batch-confirm-more {
+  color: var(--color-gray-7);
+  font-size: 12px;
 }
 
 .control-console__feature-modal-body {

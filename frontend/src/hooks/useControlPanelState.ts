@@ -4,6 +4,10 @@ import { TYPE_MINECRAFT_JAVA, verifyEULA } from "@/hooks/useInstance";
 import { t } from "@/lang/i18n";
 import { remoteInstances, remoteNodeList } from "@/services/apis";
 import {
+  batchKill,
+  batchRestart,
+  batchStart,
+  batchStop,
   getInstanceInfo,
   getInstanceOutputLog,
   killInstance,
@@ -29,7 +33,7 @@ import {
 import { reportErrorMsg } from "@/tools/validator";
 import type { InstanceDetail, NodeStatus } from "@/types";
 import { INSTANCE_STATUS_CODE } from "@/types/const";
-import type { ControlLogLine, ControlPreviewNode, ControlTarget } from "@/types/control";
+import type { ControlBatchAction, ControlLogLine, ControlPreviewNode, ControlTarget } from "@/types/control";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 export const CONTROL_PANEL_POLL_INTERVAL_MS = CONTROL_POLL_INTERVAL_MS;
@@ -92,6 +96,7 @@ export function useControlPanelState() {
   const targetLoaders = new Map<string, Promise<void>>();
   let pollTimer: number | undefined;
   let hydrateRetryTimer: number | undefined;
+  const outputRefreshTimers = new Set<number>();
 
   const getGlobalTargetStatus = (daemonId: string, daemonAvailable: boolean) => {
     if (!daemonAvailable) return INSTANCE_STATUS_CODE.STOPPED;
@@ -188,6 +193,11 @@ export function useControlPanelState() {
     return undefined;
   };
 
+  const findTargetsByBatchPayload = (targets: ControlTarget[]) =>
+    targets
+      .map((target) => findTargetByKey(createControlTargetKey(target)) || target)
+      .filter((target): target is ControlTarget => target.mode === "instance");
+
   const currentNode = computed(
     () => nodes.value.find((node) => node.daemonId === selectedDaemonId.value) || nodes.value[0]
   );
@@ -210,6 +220,17 @@ export function useControlPanelState() {
     return logsByTarget.value[targetKey] || [];
   });
 
+  const currentTargetPollingState = computed(() => {
+    const target = currentTarget.value;
+    if (!target) return "";
+    return [
+      currentTargetKey.value,
+      target.daemonAvailable ? "online" : "offline",
+      target.mode,
+      target.status ?? "unknown"
+    ].join(":");
+  });
+
   const clearPollTimer = () => {
     if (pollTimer) {
       window.clearInterval(pollTimer);
@@ -222,6 +243,11 @@ export function useControlPanelState() {
       window.clearTimeout(hydrateRetryTimer);
       hydrateRetryTimer = undefined;
     }
+  };
+
+  const clearScheduledOutputRefreshes = () => {
+    outputRefreshTimers.forEach((timerId) => window.clearTimeout(timerId));
+    outputRefreshTimers.clear();
   };
 
   const reportControlError = (
@@ -602,6 +628,23 @@ export function useControlPanelState() {
     }
   };
 
+  const scheduleTargetOutputRefresh = (target: ControlTarget, delays: number[]) => {
+    const targetKey = createControlTargetKey(target);
+
+    for (const delay of delays) {
+      const timerId = window.setTimeout(() => {
+        outputRefreshTimers.delete(timerId);
+
+        const latestTarget = findTargetByKey(targetKey);
+        if (!latestTarget) return;
+        if (createControlTargetKey(latestTarget) !== currentTargetKey.value) return;
+
+        void fetchTargetOutput(latestTarget, { forceRequest: true });
+      }, delay);
+      outputRefreshTimers.add(timerId);
+    }
+  };
+
   const startPoller = () => {
     clearPollTimer();
     const target = currentTarget.value;
@@ -695,6 +738,17 @@ export function useControlPanelState() {
     } finally {
       isRefreshing.value = false;
     }
+  };
+
+  const refreshDaemonsAfterBatch = async (daemonIds: string[]) => {
+    await Promise.allSettled(
+      [...new Set(daemonIds)].map((daemonId) =>
+        loadTargetsForDaemon(daemonId, {
+          forceRequest: true,
+          showToastOnError: false
+        })
+      )
+    );
   };
 
   const togglePolling = () => {
@@ -958,6 +1012,77 @@ export function useControlPanelState() {
     }
   };
 
+  const batchOperateTargets = async (action: ControlBatchAction, targets: ControlTarget[]) => {
+    const instanceTargets = findTargetsByBatchPayload(targets);
+    if (!instanceTargets.length) {
+      reportErrorMsg(new Error(t("TXT_CODE_CONTROL_BATCH_NO_SELECTION")));
+      return false;
+    }
+
+    const offlineTarget = instanceTargets.find((target) => !target.daemonAvailable);
+    if (offlineTarget) {
+      appendLog(offlineTarget, "error", t("TXT_CODE_CONTROL_NODE_OFFLINE_ACTION"));
+      reportErrorMsg(new Error(t("TXT_CODE_CONTROL_NODE_OFFLINE_ACTION")));
+      return false;
+    }
+
+    const requestData = instanceTargets.map((target) => ({
+      daemonId: target.daemonId,
+      instanceUuid: target.instanceId
+    }));
+    const statusMap: Record<ControlBatchAction, INSTANCE_STATUS_CODE> = {
+      start: INSTANCE_STATUS_CODE.STARTING,
+      stop: INSTANCE_STATUS_CODE.STOPPING,
+      restart: INSTANCE_STATUS_CODE.BUSY,
+      kill: INSTANCE_STATUS_CODE.BUSY
+    };
+    const labelMap: Record<ControlBatchAction, string> = {
+      start: "start",
+      stop: "stop",
+      restart: "restart",
+      kill: "terminate"
+    };
+    const executeMap = {
+      start: batchStart().execute,
+      stop: batchStop().execute,
+      restart: batchRestart().execute,
+      kill: batchKill().execute
+    };
+
+    for (const target of instanceTargets) {
+      updateTargetStatus(createControlTargetKey(target), statusMap[action]);
+      appendLog(target, action === "start" ? "info" : "warn", `[batch] ${labelMap[action]} ${target.displayName}`);
+    }
+
+    try {
+      const result = await executeMap[action]({
+        data: requestData
+      });
+
+      await refreshDaemonsAfterBatch(instanceTargets.map((target) => target.daemonId));
+
+      if (result.value) {
+        for (const target of instanceTargets) {
+          appendLog(target, "info", `[batch] ${target.displayName} ${labelMap[action]} request sent.`);
+        }
+        return true;
+      }
+
+      throw new Error(t("TXT_CODE_CONTROL_OPERATION_FAILED", { error: "" }));
+    } catch (error) {
+      await refreshDaemonsAfterBatch(instanceTargets.map((target) => target.daemonId));
+      const text = reportControlError(error, {
+        fallbackText: t("TXT_CODE_CONTROL_SERVER_ERROR"),
+        appendErrorLog: false,
+        showToast: true
+      });
+      for (const target of instanceTargets) {
+        appendLog(target, "error", text);
+      }
+      return false;
+    }
+  };
+
   const sendCommand = async () => {
     const target = currentTarget.value;
     const command = commandInput.value.trim();
@@ -994,6 +1119,7 @@ export function useControlPanelState() {
       });
       commandInput.value = "";
       appendLog(target, "command", `$ ${command}`);
+      scheduleTargetOutputRefresh(target, [350, 900, 1600]);
     } catch (error) {
       reportControlError(error, {
         fallbackText: t("TXT_CODE_CONTROL_COMMAND_FAILED"),
@@ -1004,7 +1130,7 @@ export function useControlPanelState() {
   };
 
   watch(
-    [currentTargetKey, isPollingPaused],
+    [currentTargetPollingState, isPollingPaused],
     () => {
       commandInput.value = "";
       startPoller();
@@ -1071,6 +1197,7 @@ export function useControlPanelState() {
   onUnmounted(() => {
     clearPollTimer();
     clearHydrateRetryTimer();
+    clearScheduledOutputRefreshes();
     targetLoaders.clear();
   });
 
@@ -1095,6 +1222,7 @@ export function useControlPanelState() {
     stopCurrentTarget,
     restartCurrentTarget,
     terminateCurrentTarget,
+    batchOperateTargets,
     sendCommand
   };
 }

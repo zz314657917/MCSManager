@@ -52,23 +52,29 @@ const props = withDefaults(
     currentTargets: ControlTarget[];
     currentTargetKey: string;
     favoriteTargetKeys?: string[];
+    selectedTargetKeys?: string[];
     targetNotes?: Record<string, string>;
     targetFilterDaemonId?: string;
     allTargetsFilterValue?: string;
+    batchSelectionEnabled?: boolean;
     drawer?: boolean;
   }>(),
   {
     currentNodeId: undefined,
     favoriteTargetKeys: () => [],
+    selectedTargetKeys: () => [],
     targetNotes: () => ({}),
     targetFilterDaemonId: undefined,
     allTargetsFilterValue: "__all_control_targets__",
+    batchSelectionEnabled: false,
     drawer: false
   }
 );
 
 const emit = defineEmits<{
   selectTarget: [target: ControlTarget];
+  toggleBatchSelection: [target: ControlTarget];
+  toggleVisibleBatchSelection: [targets: ControlTarget[]];
   toggleFavorite: [target: ControlTarget];
   changeTargetFilter: [daemonId: string];
   editTargetNote: [target: ControlTarget];
@@ -80,6 +86,15 @@ const handleSelectTarget = (target: ControlTarget) => {
 
 const handleToggleFavorite = (target: ControlTarget) => {
   emit("toggleFavorite", target);
+};
+
+const handleToggleBatchSelection = (target: ControlTarget) => {
+  if (target.mode !== "instance") return;
+  emit("toggleBatchSelection", target);
+};
+
+const handleToggleVisibleBatchSelection = () => {
+  emit("toggleVisibleBatchSelection", visibleInstanceTargets.value);
 };
 
 const handleChangeTargetFilter = (daemonId: string) => {
@@ -97,9 +112,20 @@ const handleEditTargetNote = (target: ControlTarget) => {
 
 const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 const favoriteTargetKeySet = computed(() => new Set(props.favoriteTargetKeys));
+const selectedTargetKeySet = computed(() => new Set(props.selectedTargetKeys));
 const getTargetKey = (target: ControlTarget) => createControlTargetKey(target);
 const isTargetFavorited = (target: ControlTarget) =>
   target.mode === "instance" && favoriteTargetKeySet.value.has(getTargetKey(target));
+const isTargetBatchSelected = (target: ControlTarget) =>
+  target.mode === "instance" && selectedTargetKeySet.value.has(getTargetKey(target));
+const visibleInstanceTargets = computed(() =>
+  props.currentTargets.filter((target) => target.mode === "instance")
+);
+const areVisibleInstanceTargetsSelected = computed(
+  () =>
+    visibleInstanceTargets.value.length > 0 &&
+    visibleInstanceTargets.value.every((target) => selectedTargetKeySet.value.has(getTargetKey(target)))
+);
 
 const getTargetNote = (target: ControlTarget) =>
   target.mode === "instance" ? String(props.targetNotes[getTargetKey(target)] || "").trim() : "";
@@ -145,6 +171,18 @@ const getNodeTintStyle = (target: ControlTarget) => {
         <div class="control-target-selector__header-copy">
           <span>{{ t("TXT_CODE_d655beec") }}</span>
           <a-tag>{{ currentTargets.length }}</a-tag>
+          <a-tag v-if="selectedTargetKeys.length" color="blue">
+            {{ t("TXT_CODE_432cbc38") }} {{ selectedTargetKeys.length }} {{ t("TXT_CODE_5cd3b4bd") }}
+          </a-tag>
+          <a-button
+            v-if="batchSelectionEnabled && visibleInstanceTargets.length"
+            type="link"
+            size="small"
+            class="control-target-selector__batch-toggle"
+            @click="handleToggleVisibleBatchSelection"
+          >
+            {{ areVisibleInstanceTargetsSelected ? t("TXT_CODE_df87c46d") : t("TXT_CODE_f466d7a") }}
+          </a-button>
         </div>
         <a-select
           class="control-target-selector__filter-select"
@@ -165,7 +203,10 @@ const getNodeTintStyle = (target: ControlTarget) => {
           v-for="target in currentTargets"
           :key="getTargetKey(target)"
           class="control-target-selector__card"
-          :class="{ 'is-active': currentTargetKey === getTargetKey(target) }"
+          :class="{
+            'is-active': currentTargetKey === getTargetKey(target),
+            'is-batch-selected': isTargetBatchSelected(target)
+          }"
           role="button"
           tabindex="0"
           :style="getNodeTintStyle(target)"
@@ -179,6 +220,18 @@ const getNodeTintStyle = (target: ControlTarget) => {
         >
           <div class="control-target-selector__target-row">
             <div class="control-target-selector__target-title-group">
+              <span
+                v-if="batchSelectionEnabled && target.mode === 'instance'"
+                class="control-target-selector__batch-checkbox"
+                @click.stop
+                @keydown.stop
+              >
+                <a-checkbox
+                  :checked="isTargetBatchSelected(target)"
+                  :aria-label="t('TXT_CODE_CONTROL_BATCH_SELECT_TARGET')"
+                  @change="handleToggleBatchSelection(target)"
+                />
+              </span>
               <component
                 :is="target.mode === 'global' ? DatabaseOutlined : AppstoreOutlined"
                 class="control-target-selector__target-icon"
@@ -306,6 +359,10 @@ const getNodeTintStyle = (target: ControlTarget) => {
   border-radius: 999px;
 }
 
+.control-target-selector__batch-toggle {
+  padding-inline: 0;
+}
+
 .control-target-selector__list {
   display: flex;
   flex-direction: column;
@@ -393,6 +450,13 @@ const getNodeTintStyle = (target: ControlTarget) => {
     inset 0 0 0 1px rgba(59, 130, 246, 0.22);
 }
 
+.control-target-selector__card.is-batch-selected {
+  border-color: rgba(37, 99, 235, 0.62);
+  box-shadow:
+    0 12px 26px rgba(37, 99, 235, 0.1),
+    inset 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
 .control-target-selector__target-row {
   display: flex;
   justify-content: space-between;
@@ -416,6 +480,12 @@ const getNodeTintStyle = (target: ControlTarget) => {
   gap: 8px;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+.control-target-selector__batch-checkbox {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
 }
 
 .control-target-selector__target-actions {

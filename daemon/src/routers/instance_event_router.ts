@@ -17,17 +17,17 @@ setInterval(() => {
       const fileInfo = fs.statSync(logFilePath);
       if (fileInfo && fileInfo.size > 1024 * MAX_LOG_SIZE) fs.removeSync(logFilePath);
     } catch (err: any) {}
+    buffer.set(instanceUuid, "");
     fs.writeFile(logFilePath, buf, { encoding: "utf-8", flag: "a" }, () => {
-      buffer.set(instanceUuid, "");
+      // New output can arrive while this async append is in flight. Keep that newer buffer intact.
     });
   });
 }, 500);
 
 // output stream record to buffer
 async function outputLog(instanceUuid: string, text: string) {
-  const buf = (buffer.get(instanceUuid) ?? "") + text;
-  if (buf.length > 1024 * 1024) buffer.set(instanceUuid, "");
-  buffer.set(instanceUuid, buf ?? null);
+  const buf = ((buffer.get(instanceUuid) ?? "") + text).slice(-(1024 * 1024));
+  buffer.set(instanceUuid, buf);
 }
 
 // instance output stream event

@@ -3517,7 +3517,11 @@
   "TXT_CODE_CONTROL_OPERATION_PENDING": "Operation in progress...",
   "TXT_CODE_CONTROL_OPERATION_SUCCESS": "Operation completed",
   "TXT_CODE_CONTROL_OPERATION_FAILED": "Operation failed: {error}",
-  "TXT_CODE_CONTROL_KEYBOARD_HINT": "Press Enter to send, up/down for history"
-,
+  "TXT_CODE_CONTROL_KEYBOARD_HINT": "Press Enter to send, up/down for history",
+  "TXT_CODE_CONTROL_BATCH_SELECT_TARGET": "Select instance for batch operation",
+  "TXT_CODE_CONTROL_BATCH_SELECTED": "{count} instances selected",
+  "TXT_CODE_CONTROL_BATCH_NO_SELECTION": "Select instances before running a batch operation",
+  "TXT_CODE_CONTROL_BATCH_CONFIRM_TITLE": "Confirm batch {action}",
+  "TXT_CODE_CONTROL_BATCH_CONFIRM_CONTENT": "This will {action} {count} instances. Confirm before continuing.",
   "TXT_CODE_CONTROL_ADVANCED_TERMINAL": "Advanced Terminal"
 }

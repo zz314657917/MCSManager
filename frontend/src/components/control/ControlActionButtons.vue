@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { t } from "@/lang/i18n";
-import type { ControlTarget } from "@/types/control";
+import type { ControlBatchAction, ControlTarget } from "@/types/control";
 import { CloseOutlined, PauseCircleOutlined, PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons-vue";
 
 export type ControlFeatureShortcut = {
@@ -17,10 +17,14 @@ withDefaults(
     primaryActionLabel: string;
     modeText: string;
     features?: ControlFeatureShortcut[];
+    batchSelectedCount?: number;
+    batchBusy?: boolean;
     mobile?: boolean;
   }>(),
   {
     features: () => [],
+    batchSelectedCount: 0,
+    batchBusy: false,
     mobile: false
   }
 );
@@ -30,6 +34,8 @@ const emit = defineEmits<{
   stop: [];
   restart: [];
   terminate: [];
+  batchOperation: [action: ControlBatchAction];
+  clearBatchSelection: [];
 }>();
 </script>
 
@@ -138,6 +144,45 @@ const emit = defineEmits<{
         {{ item.title }}
       </a-button>
     </div>
+
+    <div
+      v-if="batchSelectedCount > 0"
+      class="control-action-buttons__batch-dock"
+      data-testid="control-batch-actions-mobile"
+    >
+      <div class="control-action-buttons__batch-header">
+        <span>{{ t("TXT_CODE_CONTROL_BATCH_SELECTED", { count: batchSelectedCount }) }}</span>
+        <a-button type="link" size="small" @click="emit('clearBatchSelection')">
+          {{ t("TXT_CODE_df87c46d") }}
+        </a-button>
+      </div>
+      <div class="control-action-buttons__batch-grid">
+        <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+          <template #icon>
+            <PlayCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_8c7318b3") }}
+        </a-button>
+        <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+          <template #icon>
+            <PauseCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_148d6467") }}
+        </a-button>
+        <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          {{ t("TXT_CODE_77cc12da") }}
+        </a-button>
+        <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+          <template #icon>
+            <CloseOutlined />
+          </template>
+          {{ t("TXT_CODE_1c36c8f2") }}
+        </a-button>
+      </div>
+    </div>
   </div>
 
   <section v-else class="control-panel control-panel--actions" data-testid="control-actions-desktop">
@@ -215,6 +260,45 @@ const emit = defineEmits<{
         </a-button>
       </div>
     </div>
+
+    <div
+      v-if="batchSelectedCount > 0"
+      class="control-action-buttons__batch-section"
+      data-testid="control-batch-actions-desktop"
+    >
+      <div class="control-action-buttons__batch-header">
+        <span>{{ t("TXT_CODE_CONTROL_BATCH_SELECTED", { count: batchSelectedCount }) }}</span>
+        <a-button type="link" size="small" @click="emit('clearBatchSelection')">
+          {{ t("TXT_CODE_df87c46d") }}
+        </a-button>
+      </div>
+      <div class="control-action-buttons__batch-grid">
+        <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+          <template #icon>
+            <PlayCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_8c7318b3") }}
+        </a-button>
+        <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+          <template #icon>
+            <PauseCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_148d6467") }}
+        </a-button>
+        <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          {{ t("TXT_CODE_77cc12da") }}
+        </a-button>
+        <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+          <template #icon>
+            <CloseOutlined />
+          </template>
+          {{ t("TXT_CODE_1c36c8f2") }}
+        </a-button>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -256,6 +340,16 @@ const emit = defineEmits<{
   padding: 14px 18px 0;
 }
 
+.control-action-buttons__batch-section {
+  display: grid;
+  gap: 10px;
+  margin: 14px 18px 0;
+  padding: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .control-action-buttons__feature-title {
   color: var(--color-gray-7);
   font-size: 12px;
@@ -272,6 +366,30 @@ const emit = defineEmits<{
 
 .control-action-buttons__feature-button {
   min-width: 0;
+}
+
+.control-action-buttons__batch-dock {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.control-action-buttons__batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.control-action-buttons__batch-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .control-action-buttons__mobile-dock {
@@ -303,5 +421,11 @@ const emit = defineEmits<{
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .control-action-buttons__batch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>
