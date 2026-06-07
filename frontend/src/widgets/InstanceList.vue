@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ALL_DAEMON_MODE } from "@/config/const";
 import { t } from "@/lang/i18n";
 import type { LayoutCard } from "@/types/index";
 import {
@@ -24,17 +25,19 @@ import { router } from "@/config/router";
 import { useInstanceTagSearch, useInstanceTagTips } from "@/hooks/useInstanceTag";
 import { useMonitorOverview } from "@/hooks/useMonitorOverview";
 import { useScreen } from "@/hooks/useScreen";
-import { remoteInstances, remoteNodeList } from "@/services/apis";
+import { remoteInstances, remoteInstancesGlobal, remoteNodeList } from "@/services/apis";
 import {
   batchDelete,
   batchKill,
   batchRestart,
   batchStart,
   batchStop,
+  getInstanceInfo,
   openInstance,
   stopInstance
 } from "@/services/apis/instance";
 import { reportErrorMsg } from "@/tools/validator";
+import type { AntColumnsType } from "@/types/ant";
 import { INSTANCE_STATUS, INSTANCE_STATUS_CODE } from "@/types/const";
 import { Modal, notification } from "ant-design-vue";
 import { throttle } from "lodash";
@@ -43,6 +46,7 @@ import type { InstanceMoreDetail } from "../hooks/useInstance";
 import { useInstanceMoreDetail, verifyEULA } from "../hooks/useInstance";
 import { computeNodeName } from "../tools/nodes";
 import type { NodeStatus } from "../types/index";
+import InstanceLine from "./instance/InstanceLine.vue";
 import InstanceWorkspace from "./instance/InstanceWorkspace.vue";
 import Shortcut from "./instance/Shortcut.vue";
 
@@ -62,7 +66,6 @@ const operationForm = ref({
   status: ""
 });
 
-const ALL_REMOTE_NODES_ID = "__all__";
 interface InstanceListItem extends InstanceMoreDetail {
   daemonId?: string;
   daemonIp?: string;
@@ -73,9 +76,11 @@ interface InstanceListItem extends InstanceMoreDetail {
 }
 
 const currentRemoteNode = ref<NodeStatus>();
+const isGlobalDaemonMode = computed(() => currentRemoteNode.value?.uuid === ALL_DAEMON_MODE);
 
-const { execute: getNodes, state: nodes, isLoading: isLoading1 } = remoteNodeList();
-const { execute: getInstances, state: instances, isLoading: isLoading2 } = remoteInstances();
+const { execute: getNodes, state: nodes, isLoading: loadingNodes } = remoteNodeList();
+const { execute: getInstances, state: instances, isLoading: loadingInstance } = remoteInstances();
+const isGlobalLoading = ref(true);
 const { updateTagTips, tagTips } = useInstanceTagTips();
 const {
   tags: selectedTags,
@@ -86,7 +91,9 @@ const {
   clearTags
 } = useInstanceTagSearch();
 
-const isLoading = computed(() => isLoading1.value || isLoading2.value);
+const isLoading = computed(
+  () => loadingNodes.value || loadingInstance.value || isGlobalLoading.value
+);
 const selectedWorkspaceInstance = ref<InstanceListItem>();
 const sidebarActionLoadingKey = ref("");
 
@@ -109,30 +116,168 @@ const initNodes = async () => {
   if (nodes.value?.length === 0) {
     return reportErrorMsg(t("TXT_CODE_e3d96a26"));
   }
-  currentRemoteNode.value = undefined;
+  if (localStorage.getItem("pageSelectedRemote")) {
+    currentRemoteNode.value = JSON.parse(localStorage.pageSelectedRemote);
+    if (isGlobalDaemonMode.value) return;
+    if (!nodes.value?.some((item) => item.uuid === currentRemoteNode.value?.uuid)) {
+      currentRemoteNode.value = undefined;
+    }
+  } else {
+    currentRemoteNode.value = nodes.value?.[0];
+  }
 };
 
-const initInstancesData = async (resetPage?: boolean) => {
+const tableTreeData = ref<any[]>([]);
+
+const initInstancesData = async (resetPage?: boolean, daemonId?: string, instanceId?: string) => {
   try {
     selectedInstance.value = [];
     if (resetPage) operationForm.value.currentPage = 1;
-    if (!currentRemoteNode.value) {
-      await initNodes();
+    if (!currentRemoteNode.value) await initNodes();
+
+    if (!isGlobalDaemonMode.value) {
+      await getInstances({
+        params: {
+          page: operationForm.value.currentPage,
+          page_size: operationForm.value.pageSize,
+          status: operationForm.value.status,
+          instance_name: operationForm.value.instanceName.trim(),
+          tag: JSON.stringify(selectedTags.value),
+          daemonId: currentRemoteNode.value?.uuid ?? ""
+        }
+      });
+      updateTagTips(instances.value?.allTags || []);
+      syncWorkspaceSelection();
+      return;
     }
-    await getInstances({
+
+    updateTagTips([]);
+    isGlobalLoading.value = true;
+    if (daemonId && instanceId) {
+      const { execute: getInfo, state: info } = getInstanceInfo();
+      await getInfo({ params: { uuid: instanceId, daemonId } });
+      if (!info.value) return;
+
+      const targetNodeIndex = tableTreeData.value.findIndex((n) => n.key === daemonId);
+      if (targetNodeIndex === -1) return;
+
+      const targetChildIndex = tableTreeData.value[targetNodeIndex].children.findIndex(
+        (c: any) => c.key === instanceId
+      );
+      if (targetChildIndex === -1) return;
+
+      const d = useInstanceMoreDetail(info.value);
+      tableTreeData.value[targetNodeIndex].children[targetChildIndex].inst = d;
+      tableTreeData.value[targetNodeIndex].children[targetChildIndex].name =
+        d.config?.nickname || d.instanceUuid;
+      return;
+    }
+
+    const { execute: getGlobalInstances, state: globalInstances } = remoteInstancesGlobal();
+    await getGlobalInstances({
       params: {
-        daemonId: currentRemoteNode.value?.uuid ?? ALL_REMOTE_NODES_ID,
-        page: operationForm.value.currentPage,
-        page_size: operationForm.value.pageSize,
+        page: 1,
+        page_size: 10,
         status: operationForm.value.status,
-        instance_name: operationForm.value.instanceName.trim(),
-        tag: JSON.stringify(selectedTags.value)
+        instance_name: operationForm.value.instanceName.trim()
       }
     });
-    updateTagTips(instances.value?.allTags || []);
-    syncWorkspaceSelection();
+
+    if (globalInstances.value) {
+      const newTreeData = [];
+
+      if (!nodes.value) return;
+      for (const node of nodes.value) {
+        const nodesDataMap = globalInstances.value;
+        const item = nodesDataMap[node.uuid];
+
+        let children: any[] = [];
+        let nodeMaxPage = 1;
+        let nodeCurrentPage = 1;
+        if (item) {
+          nodeMaxPage = item.maxPage || 1;
+          nodeCurrentPage = item.page || 1;
+          if (!item.instances) continue;
+
+          children = item.instances.map((inst) => {
+            const d = useInstanceMoreDetail(inst);
+            return {
+              daemonId: node.uuid,
+              key: d.instanceUuid,
+              name: d.config?.nickname || d.instanceUuid,
+              inst: d
+            };
+          });
+
+          if (nodeCurrentPage < nodeMaxPage) {
+            children.push({
+              isLoadMore: true,
+              daemonId: node.uuid,
+              key: `${node.uuid}-load-more`
+            });
+          }
+        }
+
+        newTreeData.push({
+          key: node.uuid,
+          name: computeNodeName(node.ip, node.available, node.remarks),
+          node: node,
+          maxPage: nodeMaxPage,
+          nodeCurrentPage: nodeCurrentPage,
+          children
+        });
+      }
+
+      tableTreeData.value = newTreeData;
+    }
   } catch (err) {
     return reportErrorMsg(t("TXT_CODE_e109c091"));
+  } finally {
+    isGlobalLoading.value = false;
+  }
+};
+
+const loadMoreInstances = async (daemonId: string) => {
+  const targetNodeIndex = tableTreeData.value.findIndex((n) => n.key === daemonId);
+  if (targetNodeIndex === -1) return;
+  const nodeData = tableTreeData.value[targetNodeIndex];
+
+  const nextPage = (nodeData.nodeCurrentPage || 1) + 1;
+  const { execute: getInstances, state: instances } = remoteInstances();
+  await getInstances({
+    params: {
+      page: nextPage,
+      page_size: 10,
+      status: operationForm.value.status,
+      instance_name: operationForm.value.instanceName.trim(),
+      tag: JSON.stringify(selectedTags.value),
+      daemonId: daemonId
+    }
+  });
+
+  if (!instances.value) return;
+  const newChildren = instances.value.data.map((inst) => {
+    const d = useInstanceMoreDetail(inst);
+    return {
+      daemonId: daemonId,
+      key: d.instanceUuid,
+      name: d.config?.nickname || d.instanceUuid,
+      inst: d
+    };
+  });
+
+  nodeData.children = nodeData.children.filter((c: any) => !c.isLoadMore);
+  nodeData.children.push(...newChildren);
+
+  nodeData.nodeCurrentPage = nextPage;
+  nodeData.maxPage = instances.value.maxPage;
+
+  if (nodeData.nodeCurrentPage < nodeData.maxPage) {
+    nodeData.children.push({
+      isLoadMore: true,
+      daemonId: daemonId,
+      key: `${daemonId}-load-more`
+    });
   }
 };
 
@@ -316,31 +461,13 @@ const handleSidebarInstanceClick = (item: InstanceListItem) => {
   selectWorkspaceInstance(item);
 };
 
-const getCurrentNodeName = () => {
-  if (!currentRemoteNode.value) return t("TXT_CODE_4bedec2a");
-  return computeNodeName(
-    currentRemoteNode.value.ip || "",
-    currentRemoteNode.value.available || true,
-    currentRemoteNode.value.remarks
-  );
-};
-
-const handleChangeAllNodes = async () => {
-  try {
-    currentRemoteNode.value = undefined;
-    selectedInstance.value = [];
-    localStorage.removeItem("pageSelectedRemote");
-    await initInstancesData(true);
-  } catch (err: any) {
-    console.error(err.message);
-  }
-};
-
 const handleChangeNode = async (item: NodeStatus) => {
   try {
     currentRemoteNode.value = item;
+    clearTags();
     selectedInstance.value = [];
     await initInstancesData(true);
+    localStorage.setItem("pageSelectedRemote", JSON.stringify(item));
   } catch (err: any) {
     console.error(err.message);
   }
@@ -379,6 +506,46 @@ const toNodesPage = () => {
 const multipleMode = ref(false);
 const selectedInstance = ref<InstanceListItem[]>([]);
 
+const instanceTableColumns: AntColumnsType[] = [
+  { title: t("TXT_CODE_f70badb9"), dataIndex: "name", key: "name", width: 250, align: "left" },
+  {
+    title: t("TXT_CODE_759fb403"),
+    dataIndex: "status",
+    key: "status",
+    width: 100,
+    align: "center"
+  },
+  {
+    title: t("TXT_CODE_67d68dd1"),
+    dataIndex: "type",
+    key: "type",
+    width: 160,
+    align: "center"
+  },
+  {
+    title: t("TXT_CODE_e06fdab0"),
+    dataIndex: "lastDatetime",
+    key: "lastDatetime",
+    width: 160,
+    align: "center"
+  },
+  { title: t("TXT_CODE_b283e720"), dataIndex: "resources", key: "resources", align: "left" },
+  {
+    title: t("TXT_CODE_7e9727bd"),
+    dataIndex: "players",
+    key: "players",
+    width: 100,
+    align: "left"
+  },
+  {
+    title: t("TXT_CODE_fe731dfc"),
+    dataIndex: "actions",
+    key: "actions",
+    width: 200,
+    align: "right"
+  }
+];
+
 const findInstance = (item: InstanceListItem) => {
   return selectedInstance.value.find(
     (i) => i.instanceUuid === item.instanceUuid && getInstanceDaemonId(i) === getInstanceDaemonId(item)
@@ -403,8 +570,16 @@ const handleSelectInstance = (item: InstanceMoreDetail) => {
 };
 
 const selectAllInstances = () => {
-  if (instancesMoreInfo.value.length === selectedInstance.value.length) {
-    selectedInstance.value = [];
+  selectedInstance.value = [];
+
+  if (isGlobalDaemonMode.value) {
+    for (const node of tableTreeData.value) {
+      if (!node.children) continue;
+      for (const child of node.children) {
+        if (findInstance(child.inst)) continue;
+        selectedInstance.value.push(child.inst);
+      }
+    }
   } else {
     for (const item of instancesMoreInfo.value) {
       if (findInstance(item)) continue;
@@ -559,6 +734,14 @@ watch(isPhone, () => {
   syncWorkspaceSelection(true);
 });
 
+const globalNode = {
+  uuid: ALL_DAEMON_MODE,
+  ip: "",
+  port: 0,
+  available: true,
+  remarks: ""
+};
+
 onMounted(async () => {
   await initInstancesData();
   setRefreshFn(initInstancesData);
@@ -580,9 +763,9 @@ onMounted(async () => {
             <a-dropdown v-if="isPhone">
               <template #overlay>
                 <a-menu>
-                  <a-menu-item :key="ALL_REMOTE_NODES_ID" @click="handleChangeAllNodes">
-                    <DatabaseOutlined />
-                    {{ t("TXT_CODE_4bedec2a") }}
+                  <a-menu-item :key="ALL_DAEMON_MODE" @click="handleChangeNode(globalNode)">
+                    <AppstoreOutlined />
+                    {{ t("TXT_CODE_a60a421a") }}
                   </a-menu-item>
                   <a-menu-divider />
                   <a-menu-item
@@ -606,7 +789,15 @@ onMounted(async () => {
                 <a-typography-text
                   style="max-width: 145px"
                   :ellipsis="{ ellipsis: true }"
-                  :content="getCurrentNodeName()"
+                  :content="
+                    isGlobalDaemonMode
+                      ? t('TXT_CODE_a60a421a')
+                      : computeNodeName(
+                          currentRemoteNode?.ip || '',
+                          currentRemoteNode?.available || true,
+                          currentRemoteNode?.remarks
+                        )
+                  "
                 />
                 <DownOutlined />
               </a-button>
@@ -656,8 +847,8 @@ onMounted(async () => {
       </a-col>
       <a-col :span="24">
         <BetweenMenus>
-          <template v-if="instances" #left>
-            <div v-if="multipleMode">
+          <template v-if="instances || isGlobalDaemonMode" #left>
+            <div v-if="multipleMode && !isGlobalDaemonMode">
               <a-button class="mr-10" @click="exitMultipleMode">
                 {{ t("TXT_CODE_5366af54") }}
               </a-button>
@@ -692,18 +883,21 @@ onMounted(async () => {
               </a-dropdown>
             </div>
             <div v-else>
-              <a-button @click="multipleMode = true">{{ t("TXT_CODE_5cb656b9") }}</a-button>
+              <a-button v-if="!isGlobalDaemonMode" @click="multipleMode = true">
+                {{ t("TXT_CODE_5cb656b9") }}
+              </a-button>
               <a-button class="ml-10" @click="handleQueryInstance">
                 {{ t("TXT_CODE_b76d94e0") }}
               </a-button>
             </div>
           </template>
-          <template v-if="multipleMode" #center>
+          <template v-if="multipleMode && !isGlobalDaemonMode" #center>
             <a-typography-text>
-              {{ t("TXT_CODE_432cbc38") }}{{ selectedInstance.length }} {{ t("TXT_CODE_5cd3b4bd") }}
+              {{ t("TXT_CODE_432cbc38") }}{{ selectedInstance?.length || 0 }}
+              {{ t("TXT_CODE_5cd3b4bd") }}
             </a-typography-text>
           </template>
-          <template v-if="instances" #right>
+          <template v-if="instances && !isGlobalDaemonMode" #right>
             <a-pagination
               v-model:current="operationForm.currentPage"
               v-model:pageSize="operationForm.pageSize"
@@ -740,16 +934,16 @@ onMounted(async () => {
         <Loading></Loading>
       </a-col>
 
-      <a-col v-else-if="instancesMoreInfo.length > 0 && !isPhone" :span="24">
+      <a-col v-else-if="instancesMoreInfo.length > 0 && !isPhone && !isGlobalDaemonMode" :span="24">
         <div class="instance-workbench">
           <aside class="instance-workbench__sidebar">
             <div class="instance-workbench__node-switcher">
               <a-dropdown>
                 <template #overlay>
                   <a-menu>
-                    <a-menu-item :key="ALL_REMOTE_NODES_ID" @click="handleChangeAllNodes">
-                      <DatabaseOutlined />
-                      {{ t("TXT_CODE_4bedec2a") }}
+                    <a-menu-item :key="ALL_DAEMON_MODE" @click="handleChangeNode(globalNode)">
+                      <AppstoreOutlined />
+                      {{ t("TXT_CODE_a60a421a") }}
                     </a-menu-item>
                     <a-menu-divider />
                     <a-menu-item
@@ -773,7 +967,15 @@ onMounted(async () => {
                   <a-typography-text
                     class="instance-workbench__node-text"
                     :ellipsis="{ ellipsis: true }"
-                    :content="getCurrentNodeName()"
+                    :content="
+                      isGlobalDaemonMode
+                        ? t('TXT_CODE_a60a421a')
+                        : computeNodeName(
+                            currentRemoteNode?.ip || '',
+                            currentRemoteNode?.available || true,
+                            currentRemoteNode?.remarks
+                          )
+                    "
                   />
                   <DownOutlined />
                 </a-button>
@@ -850,7 +1052,7 @@ onMounted(async () => {
         </div>
       </a-col>
 
-      <a-col v-else-if="instancesMoreInfo.length > 0" :span="24">
+      <a-col v-else-if="!isGlobalDaemonMode && instancesMoreInfo.length > 0" :span="24">
         <a-row :gutter="[16, 16]">
           <fade-up-animation>
             <a-col
@@ -876,8 +1078,57 @@ onMounted(async () => {
         </a-row>
       </a-col>
 
+      <a-col v-else-if="isGlobalDaemonMode" :span="24">
+        <fade-up-animation>
+          <a-table
+            :data-source="tableTreeData"
+            :columns="instanceTableColumns"
+            :pagination="false"
+            size="small"
+            row-key="key"
+            :default-expand-all-rows="true"
+            :scroll="{ x: 'max-content' }"
+          >
+            <template #headerCell="{ column }">
+              <div v-if="column.key === 'name'" style="margin-left: 25px">
+                {{ column.title }}
+              </div>
+              <div v-else-if="column.key === 'actions'" style="padding-right: 10px">
+                {{ column.title }}
+              </div>
+              <div v-else>
+                {{ column.title }}
+              </div>
+            </template>
+
+            <template #bodyCell="{ column, record }">
+              <template v-if="record.isLoadMore">
+                <div
+                  v-if="column.key === 'name'"
+                  style="text-align: center; cursor: pointer; color: var(--color-blue-6)"
+                  @click="loadMoreInstances(record.daemonId)"
+                >
+                  {{ t("TXT_CODE_101ef36f") }}
+                </div>
+              </template>
+              <InstanceLine
+                v-else
+                :column="column"
+                :record="record"
+                :target-instance-info="record.inst"
+                :target-daemon-id="record.daemonId"
+                @refresh-list="
+                  (daemonId: string, instanceId: string) =>
+                    initInstancesData(false, daemonId, instanceId)
+                "
+              ></InstanceLine>
+            </template>
+          </a-table>
+        </fade-up-animation>
+      </a-col>
+
       <a-col
-        v-else-if="instancesMoreInfo.length === 0"
+        v-else-if="instancesMoreInfo?.length === 0"
         :span="24"
         class="flex align-center justify-center h-100 w-100 flex-col"
         style="position: relative"

@@ -20,6 +20,9 @@ import { IInstanceProcess } from "./interface";
 import { LifeCycleTaskManager } from "./life_cycle";
 import { IExecutable, PresetCommandManager } from "./preset";
 
+export const GLOBAL_INSTANCE_KEY = "__MCSM_GLOBAL_INSTANCE__";
+export const GLOBAL_INSTANCE_UUID_KEY = "global0001";
+
 interface IInstanceInfo {
   mcPingOnline: boolean;
   currentPlayers: number;
@@ -43,7 +46,7 @@ interface IInstanceInfo {
   memoryLimit?: number;
   storageUsage?: number;
   storageLimit?: number;
-  allocatedPorts?: { host: number; container: number; protocol: string }[];
+  allocatedPorts?: { host: string; container: number; protocol: string }[];
 }
 
 interface IWatcherInfo {
@@ -251,6 +254,8 @@ export default class Instance extends EventEmitter {
       configureEntityParams(this.config.docker, cfg.docker, "gpuCount", Number);
       configureEntityParams(this.config.docker, cfg.docker, "gpuDeviceIds");
       configureEntityParams(this.config.docker, cfg.docker, "gpuDriver", String);
+      configureEntityParams(this.config.docker, cfg.docker, "deviceReadBps");
+      configureEntityParams(this.config.docker, cfg.docker, "deviceWriteBps");
     }
     if (cfg.pingConfig) {
       configureEntityParams(this.config.pingConfig, cfg.pingConfig, "ip", String);
@@ -603,6 +608,10 @@ export default class Instance extends EventEmitter {
       };
     }
     return env;
+  }
+
+  public isGlobalInstance() {
+    return this.instanceUuid === GLOBAL_INSTANCE_UUID_KEY;
   }
 
   private pushOutput(data: string) {
