@@ -9,6 +9,7 @@ import {
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
+  MessageOutlined,
   SettingOutlined,
   ShopOutlined,
   ShoppingOutlined,
@@ -25,6 +26,9 @@ const isExpanded = ref(false);
 
 const routePathIcons: Record<string, Component> = {
   "/control": DesktopOutlined,
+  "/gm": TeamOutlined,
+  "/gm/chat": MessageOutlined,
+  "/players": UserOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
   "/overview": AreaChartOutlined,

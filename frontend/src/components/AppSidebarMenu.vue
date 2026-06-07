@@ -13,6 +13,7 @@ import {
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
+  MessageOutlined,
   SettingOutlined,
   ShopOutlined,
   ShoppingOutlined,
@@ -37,6 +38,9 @@ const isRouteActive = (path: string): boolean => {
 /** Sidebar icon for each route path */
 const routePathIcons: Record<string, Component> = {
   "/control": DesktopOutlined,
+  "/gm": TeamOutlined,
+  "/gm/chat": MessageOutlined,
+  "/players": UserOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
   "/overview": AreaChartOutlined,

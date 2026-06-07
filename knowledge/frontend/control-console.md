@@ -34,3 +34,8 @@ last_verified: 2026-05-21
 # 验证
 - 这类改动至少运行 `frontend` 的 `vitest` 针对性用例和 `npm.cmd run type-check`。
 - 如果改动触及导出、构建路径或共享工具，补跑 `npm.cmd run build-only`。
+
+# 运维页面入口
+- `/control` 是主控制台，包含实例管理、日志终端和批量操作入口。
+- `/gm` 是 GM 玩家管理页，`/gm/chat` 是 GM 聊天页。
+- `/players` 是独立玩家互动预览页，挂载 `PlayerInteractionConsole.vue`，不应再重定向到 `/gm`。

@@ -63,7 +63,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 </script>
 
 <template>
-  <div class="players-console">
+  <div class="players-console" data-testid="players-console">
     <OperationsPageShell
       :title="t('TXT_CODE_PLAYERS_TITLE')"
       :eyebrow="t('TXT_CODE_PLAYERS_EYEBROW')"

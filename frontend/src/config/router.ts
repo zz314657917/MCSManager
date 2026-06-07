@@ -7,6 +7,7 @@ import GMConsole from "@/views/GMConsole.vue";
 import InstallPage from "@/views/Install.vue";
 import LayoutContainer from "@/views/LayoutContainer.vue";
 import LoginPage from "@/views/Login.vue";
+import PlayerInteractionConsole from "@/views/PlayerInteractionConsole.vue";
 import SsoBindLogin from "@/views/SsoBindLogin.vue";
 import {
   createRouter,
@@ -125,34 +126,35 @@ const originRouterConfig: RouterConfig[] = [
   },
   {
     path: "/gm",
-    name: "GM 管理",
+    name: t("TXT_CODE_GM_MANAGEMENT"),
     component: GMConsole,
     meta: {
       permission: ROLE.ADMIN,
-      mainMenu: false,
+      mainMenu: true,
       chromeMode: "minimal",
       desktopChromeMode: "top-nav"
     }
   },
   {
     path: "/gm/chat",
-    name: "GM 聊天",
+    name: t("TXT_CODE_PLAYERS_CHAT"),
     component: GMConsole,
     meta: {
       permission: ROLE.ADMIN,
-      mainMenu: false,
+      mainMenu: true,
       chromeMode: "minimal",
       desktopChromeMode: "top-nav"
     }
   },
   {
     path: "/players",
-    name: "GM Redirect",
-    redirect: "/gm",
+    name: t("TXT_CODE_PLAYERS_TITLE"),
+    component: PlayerInteractionConsole,
     meta: {
       permission: ROLE.ADMIN,
-      mainMenu: false,
-      chromeMode: "minimal"
+      mainMenu: true,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
     }
   },
   {

@@ -144,6 +144,14 @@ test("control mobile preview opens selector drawer and navigates with bottom nav
   await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "manage");
 });
 
+test("players desktop preview remains available as standalone page", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/players", "players-console");
+  await expect(page.getByTestId("players-console")).toContainText(/玩家互动|Players/);
+  await expect(page.getByTestId("gm-console")).toHaveCount(0);
+});
+
 test("gm desktop preview supports player selection and economy action", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
 
