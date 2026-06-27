@@ -132,6 +132,14 @@ const getTargetNote = (target: ControlTarget) =>
 
 const getTargetDisplayTitle = (target: ControlTarget) => getTargetNote(target) || target.displayName;
 
+const getTargetMetaText = (target: ControlTarget) => {
+  if (target.mode !== "instance") return getControlTargetIdentity(target);
+  if (target.onlinePlayers == null) return "人数 --";
+  return target.maxPlayers == null
+    ? `人数 ${target.onlinePlayers}`
+    : `人数 ${target.onlinePlayers} / ${target.maxPlayers}`;
+};
+
 const targetFilterOptions = computed(() => [
   {
     label: t("TXT_CODE_CONTROL_ALL_TARGETS"),
@@ -295,7 +303,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
               {{ target.daemonDisplayName }}
             </a-tag>
             <span class="control-target-selector__target-identity">
-              {{ getControlTargetIdentity(target) }}
+              {{ getTargetMetaText(target) }}
             </span>
           </div>
         </div>

@@ -667,15 +667,88 @@ const controlFeatureItems = computed<ControlFeatureShortcut[]>(() => {
 
 const currentOnlinePlayerCountText = computed(() => `${onlinePlayers.value.length}`);
 
+const getConfirmTargetName = (target: ControlTarget) => getTargetNote(target) || target.displayName;
+
+const renderConfirmDetails = (
+  target: ControlTarget,
+  impactScope: string,
+  operationLabel: string,
+  impactDanger = false
+) =>
+  h("div", { class: "control-console__confirm-details" }, [
+    h("div", { class: "control-console__confirm-detail" }, [
+      h("span", { class: "control-console__confirm-label" }, t("TXT_CODE_CONTROL_TARGET")),
+      h("strong", { class: "control-console__confirm-value" }, getConfirmTargetName(target))
+    ]),
+    h("div", { class: "control-console__confirm-detail" }, [
+      h("span", { class: "control-console__confirm-label" }, t("TXT_CODE_b26a0528")),
+      h("span", { class: "control-console__confirm-value" }, target.daemonDisplayName)
+    ]),
+    h("div", { class: "control-console__confirm-detail" }, [
+      h("span", { class: "control-console__confirm-label" }, t("TXT_CODE_adea33ce")),
+      h("span", { class: "control-console__confirm-value" }, operationLabel)
+    ]),
+    h("div", { class: "control-console__confirm-detail" }, [
+      h("span", { class: "control-console__confirm-label" }, "影响范围"),
+      h(
+        "span",
+        {
+          class: [
+            "control-console__confirm-value",
+            impactDanger ? "control-console__confirm-value--danger" : ""
+          ]
+        },
+        impactScope
+      )
+    ])
+  ]);
+
+const renderTargetConfirmContent = (
+  target: ControlTarget,
+  intro: string,
+  operationLabel: string,
+  impactScope: string,
+  warning?: string
+) =>
+  h("div", { class: "control-console__confirm" }, [
+    h("div", intro),
+    renderConfirmDetails(target, impactScope, operationLabel, Boolean(warning)),
+    warning ? h("div", { class: "control-console__confirm-warning" }, warning) : null
+  ]);
+
+const getStopImpactScope = (target: ControlTarget) =>
+  target.mode === "global"
+    ? "关闭当前节点的宿主机 Shell，不会停止任何实例进程。"
+    : "停止当前实例进程，在线玩家会断开连接。";
+
+const getBatchImpactScope = (action: ControlBatchAction, count: number) => {
+  if (action === "start") return `向 ${count} 个实例发送启动请求。`;
+  if (action === "restart") return `重启 ${count} 个实例，在线玩家会短暂断开连接。`;
+  if (action === "stop") return `停止 ${count} 个实例进程，在线玩家会断开连接。`;
+  return `强制终止 ${count} 个实例进程，可能造成未保存数据丢失或世界数据损坏。`;
+};
+
+const getBatchDangerWarning = (action: ControlBatchAction) => {
+  if (action === "stop") return "停止属于危险操作，请确认目标实例可以进入维护或关服状态。";
+  if (action === "kill") return "强制终止会跳过正常关服流程，只建议在实例卡死或无法正常停止时使用。";
+  return "";
+};
+
 const handleStopCurrentTarget = () => {
-  if (!currentTarget.value) return;
+  const target = currentTarget.value;
+  if (!target) return;
 
   Modal.confirm({
     title: t("TXT_CODE_CONTROL_CONFIRM_STOP"),
-    content:
-      currentTarget.value.mode === "global"
+    content: renderTargetConfirmContent(
+      target,
+      target.mode === "global"
         ? t("TXT_CODE_CONTROL_CONFIRM_CLOSE_HOST")
         : t("TXT_CODE_CONTROL_CONFIRM_STOP_INSTANCE"),
+      t("TXT_CODE_148d6467"),
+      getStopImpactScope(target),
+      target.mode === "instance" ? "请确认当前在线玩家已收到通知，或该实例允许立即停止。" : undefined
+    ),
     okText: t("TXT_CODE_148d6467"),
     cancelText: t("TXT_CODE_a0451c97"),
     okButtonProps: {
@@ -688,23 +761,17 @@ const handleStopCurrentTarget = () => {
 };
 
 const handleRestartCurrentTarget = () => {
-  if (currentTarget.value?.mode !== "instance") return;
+  const target = currentTarget.value;
+  if (target?.mode !== "instance") return;
 
   Modal.confirm({
     title: t("TXT_CODE_77cc12da"),
-    content: h("div", { style: "display:flex;flex-direction:column;gap:8px;" }, [
-      h("div", t("TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE")),
-      h("div", { style: "display:flex;flex-wrap:wrap;gap:6px;align-items:center;" }, [
-        h("span", "实例："),
-        h(
-          "strong",
-          {
-            style: "color:#ff4d4f;font-weight:700;word-break:break-all;"
-          },
-          currentTargetTitle.value
-        )
-      ])
-    ]),
+    content: renderTargetConfirmContent(
+      target,
+      t("TXT_CODE_CONTROL_CONFIRM_RESTART_INSTANCE"),
+      t("TXT_CODE_77cc12da"),
+      "重启实例进程，在线玩家会短暂断开连接。"
+    ),
     okText: t("TXT_CODE_77cc12da"),
     cancelText: t("TXT_CODE_a0451c97"),
     async onOk() {
@@ -742,11 +809,14 @@ const handleBatchOperation = (action: ControlBatchAction) => {
     return;
   }
 
+  const isDangerAction = BATCH_OPERATION_DANGER_ACTIONS.has(action);
+  const warning = getBatchDangerWarning(action);
+
   Modal.confirm({
     title: t("TXT_CODE_CONTROL_BATCH_CONFIRM_TITLE", {
       action: batchOperationLabels[action]
     }),
-    content: h("div", { class: "control-console__batch-confirm" }, [
+    content: h("div", { class: ["control-console__batch-confirm", isDangerAction ? "is-danger" : ""] }, [
       h(
         "div",
         t("TXT_CODE_CONTROL_BATCH_CONFIRM_CONTENT", {
@@ -754,12 +824,32 @@ const handleBatchOperation = (action: ControlBatchAction) => {
           count: targets.length
         })
       ),
+      h("div", { class: "control-console__confirm-details" }, [
+        h("div", { class: "control-console__confirm-detail" }, [
+          h("span", { class: "control-console__confirm-label" }, t("TXT_CODE_adea33ce")),
+          h("span", { class: "control-console__confirm-value" }, batchOperationLabels[action])
+        ]),
+        h("div", { class: "control-console__confirm-detail" }, [
+          h("span", { class: "control-console__confirm-label" }, "影响范围"),
+          h(
+            "span",
+            {
+              class: [
+                "control-console__confirm-value",
+                isDangerAction ? "control-console__confirm-value--danger" : ""
+              ]
+            },
+            getBatchImpactScope(action, targets.length)
+          )
+        ])
+      ]),
+      warning ? h("div", { class: "control-console__confirm-warning" }, warning) : null,
       h(
         "div",
         { class: "control-console__batch-confirm-list" },
         targets.slice(0, 8).map((target) =>
           h("span", { class: "control-console__batch-confirm-item" }, [
-            h("strong", getTargetNote(target) || target.displayName),
+            h("strong", getConfirmTargetName(target)),
             h("span", ` / ${target.daemonDisplayName}`)
           ])
         )
@@ -780,11 +870,18 @@ const handleBatchOperation = (action: ControlBatchAction) => {
 };
 
 const handleTerminateCurrentTarget = () => {
-  if (currentTarget.value?.mode !== "instance") return;
+  const target = currentTarget.value;
+  if (target?.mode !== "instance") return;
 
   Modal.confirm({
     title: t("TXT_CODE_893567ac"),
-    content: t("TXT_CODE_ec08484"),
+    content: renderTargetConfirmContent(
+      target,
+      t("TXT_CODE_ec08484"),
+      t("TXT_CODE_1c36c8f2"),
+      "强制终止实例进程，可能造成未保存数据丢失或世界数据损坏。",
+      "请只在实例卡死、无法正常停止或紧急维护时使用。"
+    ),
     okText: t("TXT_CODE_7b67813a"),
     cancelText: t("TXT_CODE_a0451c97"),
     okButtonProps: {
@@ -2137,12 +2234,64 @@ onUnmounted(() => {
   margin-bottom: 14px;
 }
 
-.control-console__batch-confirm {
+:global(.control-console__confirm) {
   display: grid;
   gap: 10px;
 }
 
-.control-console__batch-confirm-list {
+:global(.control-console__confirm-details) {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+:global(.control-console__confirm-detail) {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+:global(.control-console__confirm-label) {
+  color: var(--color-gray-7);
+  font-size: 12px;
+}
+
+:global(.control-console__confirm-value) {
+  min-width: 0;
+  word-break: break-word;
+}
+
+:global(.control-console__confirm-value--danger),
+:global(.control-console__confirm-warning) {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+:global(.control-console__confirm-warning) {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:global(.control-console__batch-confirm) {
+  display: grid;
+  gap: 10px;
+}
+
+:global(.control-console__batch-confirm.is-danger) {
+  padding: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+:global(.control-console__batch-confirm-list) {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2150,7 +2299,7 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
-.control-console__batch-confirm-item {
+:global(.control-console__batch-confirm-item) {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -2159,7 +2308,7 @@ onUnmounted(() => {
   background: rgba(148, 163, 184, 0.1);
 }
 
-.control-console__batch-confirm-more {
+:global(.control-console__batch-confirm-more) {
   color: var(--color-gray-7);
   font-size: 12px;
 }

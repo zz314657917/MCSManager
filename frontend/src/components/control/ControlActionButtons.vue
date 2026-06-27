@@ -45,87 +45,63 @@ const emit = defineEmits<{
     class="control-action-buttons__mobile-dock"
     data-testid="control-actions-mobile"
   >
-    <div
-      v-if="target.mode === 'instance'"
-      class="control-action-buttons__main-grid"
-    >
-      <a-button
-        class="control-action-buttons__mobile-button"
-        type="primary"
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-start"
-        @click="emit('start')"
-      >
-        <template #icon>
-          <PlayCircleOutlined />
-        </template>
-        {{ primaryActionLabel }}
-      </a-button>
-      <a-button
-        class="control-action-buttons__mobile-button"
-        danger
-        ghost
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-stop"
-        @click="emit('stop')"
-      >
-        <template #icon>
-          <PauseCircleOutlined />
-        </template>
-        {{ t("TXT_CODE_148d6467") }}
-      </a-button>
-      <a-button
-        class="control-action-buttons__mobile-button"
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-restart"
-        @click="emit('restart')"
-      >
-        <template #icon>
-          <ReloadOutlined />
-        </template>
-        {{ t("TXT_CODE_77cc12da") }}
-      </a-button>
-      <a-button
-        class="control-action-buttons__mobile-button"
-        danger
-        :disabled="!target.daemonAvailable || target.status === 0"
-        data-testid="control-action-terminate"
-        @click="emit('terminate')"
-      >
-        <template #icon>
-          <CloseOutlined />
-        </template>
-        {{ t("TXT_CODE_1c36c8f2") }}
-      </a-button>
-    </div>
+    <div class="control-action-buttons__mobile-groups">
+      <div class="control-action-buttons__action-group control-action-buttons__action-group--primary">
+        <a-button
+          class="control-action-buttons__mobile-button"
+          type="primary"
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-start"
+          @click="emit('start')"
+        >
+          <template #icon>
+            <PlayCircleOutlined />
+          </template>
+          {{ primaryActionLabel }}
+        </a-button>
+        <a-button
+          v-if="target.mode === 'instance'"
+          class="control-action-buttons__mobile-button"
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-restart"
+          @click="emit('restart')"
+        >
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          {{ t("TXT_CODE_77cc12da") }}
+        </a-button>
+      </div>
 
-    <template v-else>
-      <a-button
-        class="control-action-buttons__mobile-button"
-        type="primary"
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-start"
-        @click="emit('start')"
-      >
-        <template #icon>
-          <PlayCircleOutlined />
-        </template>
-        {{ primaryActionLabel }}
-      </a-button>
-      <a-button
-        class="control-action-buttons__mobile-button"
-        danger
-        ghost
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-stop"
-        @click="emit('stop')"
-      >
-        <template #icon>
-          <PauseCircleOutlined />
-        </template>
-        {{ t("TXT_CODE_148d6467") }}
-      </a-button>
-    </template>
+      <div class="control-action-buttons__action-group control-action-buttons__action-group--danger">
+        <a-button
+          class="control-action-buttons__mobile-button"
+          danger
+          ghost
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-stop"
+          @click="emit('stop')"
+        >
+          <template #icon>
+            <PauseCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_148d6467") }}
+        </a-button>
+        <a-button
+          v-if="target.mode === 'instance'"
+          class="control-action-buttons__mobile-button"
+          danger
+          :disabled="!target.daemonAvailable || target.status === 0"
+          data-testid="control-action-terminate"
+          @click="emit('terminate')"
+        >
+          <template #icon>
+            <CloseOutlined />
+          </template>
+          {{ t("TXT_CODE_1c36c8f2") }}
+        </a-button>
+      </div>
+    </div>
 
     <div
       v-if="features.length"
@@ -156,31 +132,35 @@ const emit = defineEmits<{
           {{ t("TXT_CODE_df87c46d") }}
         </a-button>
       </div>
-      <div class="control-action-buttons__batch-grid">
-        <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
-          <template #icon>
-            <PlayCircleOutlined />
-          </template>
-          {{ t("TXT_CODE_8c7318b3") }}
-        </a-button>
-        <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
-          <template #icon>
-            <PauseCircleOutlined />
-          </template>
-          {{ t("TXT_CODE_148d6467") }}
-        </a-button>
-        <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
-          <template #icon>
-            <ReloadOutlined />
-          </template>
-          {{ t("TXT_CODE_77cc12da") }}
-        </a-button>
-        <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
-          <template #icon>
-            <CloseOutlined />
-          </template>
-          {{ t("TXT_CODE_1c36c8f2") }}
-        </a-button>
+      <div class="control-action-buttons__batch-groups">
+        <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--primary">
+          <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+            <template #icon>
+              <PlayCircleOutlined />
+            </template>
+            {{ t("TXT_CODE_8c7318b3") }}
+          </a-button>
+          <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
+            <template #icon>
+              <ReloadOutlined />
+            </template>
+            {{ t("TXT_CODE_77cc12da") }}
+          </a-button>
+        </div>
+        <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--danger">
+          <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+            <template #icon>
+              <PauseCircleOutlined />
+            </template>
+            {{ t("TXT_CODE_148d6467") }}
+          </a-button>
+          <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+            <template #icon>
+              <CloseOutlined />
+            </template>
+            {{ t("TXT_CODE_1c36c8f2") }}
+          </a-button>
+        </div>
       </div>
     </div>
   </div>
@@ -190,57 +170,62 @@ const emit = defineEmits<{
       <span>{{ t("TXT_CODE_OPERATE") }}</span>
       <a-tag :bordered="false">{{ modeText }}</a-tag>
     </div>
-    <div class="control-action-buttons__row">
-      <a-button
-        class="control-action-buttons__button"
-        type="primary"
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-start"
-        @click="emit('start')"
-      >
-        <template #icon>
-          <PlayCircleOutlined />
-        </template>
-        {{ primaryActionLabel }}
-      </a-button>
-      <a-button
-        class="control-action-buttons__button"
-        danger
-        ghost
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-stop"
-        @click="emit('stop')"
-      >
-        <template #icon>
-          <PauseCircleOutlined />
-        </template>
-        {{ t("TXT_CODE_148d6467") }}
-      </a-button>
-      <a-button
-        v-if="target.mode === 'instance'"
-        class="control-action-buttons__button"
-        :disabled="!target.daemonAvailable"
-        data-testid="control-action-restart"
-        @click="emit('restart')"
-      >
-        <template #icon>
-          <ReloadOutlined />
-        </template>
-        {{ t("TXT_CODE_77cc12da") }}
-      </a-button>
-      <a-button
-        v-if="target.mode === 'instance'"
-        class="control-action-buttons__button"
-        danger
-        :disabled="!target.daemonAvailable || target.status === 0"
-        data-testid="control-action-terminate"
-        @click="emit('terminate')"
-      >
-        <template #icon>
-          <CloseOutlined />
-        </template>
-        {{ t("TXT_CODE_1c36c8f2") }}
-      </a-button>
+    <div class="control-action-buttons__groups">
+      <div class="control-action-buttons__action-group control-action-buttons__action-group--primary">
+        <a-button
+          class="control-action-buttons__button"
+          type="primary"
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-start"
+          @click="emit('start')"
+        >
+          <template #icon>
+            <PlayCircleOutlined />
+          </template>
+          {{ primaryActionLabel }}
+        </a-button>
+        <a-button
+          v-if="target.mode === 'instance'"
+          class="control-action-buttons__button"
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-restart"
+          @click="emit('restart')"
+        >
+          <template #icon>
+            <ReloadOutlined />
+          </template>
+          {{ t("TXT_CODE_77cc12da") }}
+        </a-button>
+      </div>
+
+      <div class="control-action-buttons__action-group control-action-buttons__action-group--danger">
+        <a-button
+          class="control-action-buttons__button"
+          danger
+          ghost
+          :disabled="!target.daemonAvailable"
+          data-testid="control-action-stop"
+          @click="emit('stop')"
+        >
+          <template #icon>
+            <PauseCircleOutlined />
+          </template>
+          {{ t("TXT_CODE_148d6467") }}
+        </a-button>
+        <a-button
+          v-if="target.mode === 'instance'"
+          class="control-action-buttons__button"
+          danger
+          :disabled="!target.daemonAvailable || target.status === 0"
+          data-testid="control-action-terminate"
+          @click="emit('terminate')"
+        >
+          <template #icon>
+            <CloseOutlined />
+          </template>
+          {{ t("TXT_CODE_1c36c8f2") }}
+        </a-button>
+      </div>
     </div>
 
     <div v-if="features.length" class="control-action-buttons__feature-section">
@@ -272,31 +257,35 @@ const emit = defineEmits<{
           {{ t("TXT_CODE_df87c46d") }}
         </a-button>
       </div>
-      <div class="control-action-buttons__batch-grid">
-        <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
-          <template #icon>
-            <PlayCircleOutlined />
-          </template>
-          {{ t("TXT_CODE_8c7318b3") }}
-        </a-button>
-        <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
-          <template #icon>
-            <PauseCircleOutlined />
-          </template>
-          {{ t("TXT_CODE_148d6467") }}
-        </a-button>
-        <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
-          <template #icon>
-            <ReloadOutlined />
-          </template>
-          {{ t("TXT_CODE_77cc12da") }}
-        </a-button>
-        <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
-          <template #icon>
-            <CloseOutlined />
-          </template>
-          {{ t("TXT_CODE_1c36c8f2") }}
-        </a-button>
+      <div class="control-action-buttons__batch-groups">
+        <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--primary">
+          <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+            <template #icon>
+              <PlayCircleOutlined />
+            </template>
+            {{ t("TXT_CODE_8c7318b3") }}
+          </a-button>
+          <a-button :loading="batchBusy" @click="emit('batchOperation', 'restart')">
+            <template #icon>
+              <ReloadOutlined />
+            </template>
+            {{ t("TXT_CODE_77cc12da") }}
+          </a-button>
+        </div>
+        <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--danger">
+          <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+            <template #icon>
+              <PauseCircleOutlined />
+            </template>
+            {{ t("TXT_CODE_148d6467") }}
+          </a-button>
+          <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+            <template #icon>
+              <CloseOutlined />
+            </template>
+            {{ t("TXT_CODE_1c36c8f2") }}
+          </a-button>
+        </div>
       </div>
     </div>
   </section>
@@ -327,11 +316,33 @@ const emit = defineEmits<{
   font-weight: 700;
 }
 
-.control-action-buttons__row {
+.control-action-buttons__groups,
+.control-action-buttons__mobile-groups {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.control-action-buttons__mobile-groups {
+  padding: 0;
+}
+
+.control-action-buttons__action-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 0 18px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.control-action-buttons__action-group--danger {
+  padding: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.control-action-buttons__button {
+  min-width: 0;
 }
 
 .control-action-buttons__feature-section {
@@ -388,8 +399,20 @@ const emit = defineEmits<{
 
 .control-action-buttons__batch-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.control-action-buttons__batch-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.control-action-buttons__batch-grid--danger {
+  padding: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.05);
 }
 
 .control-action-buttons__mobile-dock {
@@ -405,12 +428,6 @@ const emit = defineEmits<{
     0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
-.control-action-buttons__main-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .control-action-buttons__mobile-button {
   min-width: 0;
   height: 42px;
@@ -424,6 +441,11 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 640px) {
+  .control-action-buttons__action-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .control-action-buttons__batch-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -12,6 +12,8 @@ export interface ControlTarget {
   status?: INSTANCE_STATUS_CODE;
   description?: string;
   instanceType?: string;
+  onlinePlayers?: number;
+  maxPlayers?: number;
 }
 
 export type ControlBatchAction = "start" | "stop" | "restart" | "kill";

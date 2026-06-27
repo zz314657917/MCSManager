@@ -390,7 +390,9 @@ export function useControlPanelState() {
         displayName: String(instance.config?.nickname || instanceId),
         description,
         status: instance.status,
-        instanceType: String(instance.config?.type || "")
+        instanceType: String(instance.config?.type || ""),
+        onlinePlayers: instance.info?.mcPingOnline ? instance.info.currentPlayers : undefined,
+        maxPlayers: instance.info?.mcPingOnline ? instance.info.maxPlayers : undefined
       });
     }
 
