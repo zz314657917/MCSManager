@@ -3545,5 +3545,8 @@
   "TXT_CODE_6542489a": "Example: /dev/sda:10MB",
   "TXT_CODE_9d2e6d5e": "Device Write Rate Limit (BPS)",
   "TXT_CODE_2b2ff3ff": "Limit the write rate of specific block devices for the container. Format: /dev/sda:5MB. Separate multiple devices with commas.",
-  "TXT_CODE_f0dc9eca": "Example: /dev/sda:5MB"
+  "TXT_CODE_f0dc9eca": "Example: /dev/sda:5MB",
+  "TXT_CODE_95192169": "Allow all users to create API keys",
+  "TXT_CODE_820260c5": "Allow users to create API keys for API access",
+  "TXT_CODE_db253979": "API key creation is disabled"
 }
