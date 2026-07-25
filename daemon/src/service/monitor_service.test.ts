@@ -110,7 +110,7 @@ fakeSubsystem.setInstances([instance]);
 
 service.recordHeartbeat({
   serverId: instance.instanceUuid,
-  instanceToken: globalConfiguration.config.key,
+  instanceToken: service.getExpectedToken(instance.instanceUuid),
   timestamp: now - 1000,
   tps: {
     oneMin: 19.8,
