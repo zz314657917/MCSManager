@@ -11,4 +11,31 @@
   --app-max-width: 1360px;
 
   --color-always-white: #ffffff;
+
+  --design-canvas: #f7f7f4;
+  --design-canvas-soft: #fafaf7;
+  --design-surface-card: #ffffff;
+  --design-surface-strong: #e6e5e0;
+  --design-ink: #26251e;
+  --design-body: #5a5852;
+  --design-muted: #807d72;
+  --design-muted-soft: #a09c92;
+  --design-hairline: #e6e5e0;
+  --design-hairline-soft: #efeee8;
+  --design-hairline-strong: #cfcdc4;
+  --design-primary: #f54e00;
+  --design-primary-active: #d04200;
+  --design-success: #1f8a65;
+  --design-error: #cf2d56;
+  --design-warning: #c08532;
+  --design-radius-xs: 4px;
+  --design-radius-sm: 6px;
+  --design-radius-md: 8px;
+  --design-radius-lg: 8px;
+  --design-shadow-flat: 0 0 0 rgba(0, 0, 0, 0);
+  --design-font-sans:
+    Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, "Noto Sans",
+    sans-serif;
+  --design-font-mono:
+    "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, monospace;
 }

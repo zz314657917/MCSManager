@@ -61,6 +61,20 @@ export type SidebarEntry =
   | SidebarAppEntry
   | SidebarAppDropdownEntry;
 
+export function isMenuRouteActive(
+  currentPath: string,
+  path: string,
+  menuPaths: readonly string[]
+): boolean {
+  if (currentPath === path) return true;
+  if (path === "/" || !currentPath.startsWith(path + "/")) return false;
+
+  return !menuPaths.some((candidatePath) => {
+    if (candidatePath === path || !candidatePath.startsWith(path + "/")) return false;
+    return currentPath === candidatePath || currentPath.startsWith(candidatePath + "/");
+  });
+}
+
 export function useHeaderMenus() {
   const { saveGlobalLayoutConfig, resetGlobalLayoutConfig } = useLayoutConfigStore();
   const { containerState, changeDesignMode } = useLayoutContainerStore();

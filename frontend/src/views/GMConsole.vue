@@ -27,7 +27,15 @@ const chatBodyRef = ref<HTMLDivElement>();
 const operationsDrawerOpen = ref(false);
 const shellRef = ref<InstanceType<typeof OperationsPageShell>>();
 
-const isLocalPreviewMode = appState.userInfo?.token === "local-preview-token";
+const isPreviewQueryEnabled = (value: unknown) => {
+  const normalized = Array.isArray(value) ? value[0] : value;
+  return ["1", "true", "local", "mock"].includes(String(normalized || "").toLowerCase());
+};
+
+const isLocalPreviewMode =
+  appState.userInfo?.token === "local-preview-token" ||
+  isPreviewQueryEnabled(route.query.preview) ||
+  isPreviewQueryEnabled(route.query.localPreview);
 const gmState = isLocalPreviewMode ? useGmConsolePreviewState() : useGmConsoleState();
 
 const {

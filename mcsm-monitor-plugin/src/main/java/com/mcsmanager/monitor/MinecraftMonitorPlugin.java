@@ -22,10 +22,13 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
     private LocalControlServer localControlServer;
     private MuteService muteService;
     private VaultEconomyAdapter vaultEconomyAdapter;
+    private PlayerCurrencyAdapter playerCurrencyAdapter;
     private PlayerPointsAdapter playerPointsAdapter;
     private LuckPermsAdapter luckPermsAdapter;
     private InventorySnapshotAdapter inventorySnapshotAdapter;
     private ControlActionDispatcher controlActionDispatcher;
+    private EconomyEventReporter economyEventReporter;
+    private EconomySnapshotReporter economySnapshotReporter;
 
     @Override
     public void onEnable() {
@@ -90,6 +93,10 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         return vaultEconomyAdapter;
     }
 
+    PlayerCurrencyAdapter getPlayerCurrencyAdapter() {
+        return playerCurrencyAdapter;
+    }
+
     PlayerPointsAdapter getPlayerPointsAdapter() {
         return playerPointsAdapter;
     }
@@ -108,6 +115,20 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
 
     boolean isUploadFailureLogEnabled() {
         return getConfig().getBoolean("logUploadFailures", getConfig().getBoolean("logHeartbeatFailures", true));
+    }
+
+    boolean isEconomyReportingEnabled() {
+        return getConfig().getBoolean("economy.enabled", true);
+    }
+
+    String getDefaultEconomyCurrencyType() {
+        String value = getConfig().getString("economy.defaultCurrency", "money");
+        return value == null || value.trim().isEmpty() ? "money" : value.trim();
+    }
+
+    String getDefaultEconomyCurrencyName() {
+        String value = getConfig().getString("economy.defaultCurrencyName", "落叶币");
+        return value == null || value.trim().isEmpty() ? "落叶币" : value.trim();
     }
 
     String getEndpointPath(String configPath, String defaultValue) {
@@ -129,6 +150,8 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
     LinkedHashMap<String, Object> createSupportFlags() {
         LinkedHashMap<String, Object> supports = new LinkedHashMap<String, Object>();
         supports.put("economy", Boolean.valueOf(vaultEconomyAdapter != null && vaultEconomyAdapter.isAvailable()));
+        supports.put("playerCurrency", Boolean.valueOf(playerCurrencyAdapter != null && playerCurrencyAdapter.isAvailable()));
+        supports.put("playerCurrencyStatus", playerCurrencyAdapter == null ? "not-initialized" : playerCurrencyAdapter.getStatusText());
         supports.put("points", Boolean.valueOf(playerPointsAdapter != null && playerPointsAdapter.isAvailable()));
         supports.put("luckPerms", Boolean.valueOf(luckPermsAdapter != null && luckPermsAdapter.isAvailable()));
         supports.put("mute", Boolean.TRUE);
@@ -155,6 +178,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
 
         LinkedHashMap<String, Object> actions = new LinkedHashMap<String, Object>();
         actions.put("economy", Boolean.valueOf(vaultEconomyAdapter != null && vaultEconomyAdapter.isAvailable()));
+        actions.put("playerCurrency", Boolean.valueOf(playerCurrencyAdapter != null && playerCurrencyAdapter.isAvailable()));
         actions.put("points", Boolean.valueOf(playerPointsAdapter != null && playerPointsAdapter.isAvailable()));
         actions.put("luckPerms", Boolean.valueOf(luckPermsAdapter != null && luckPermsAdapter.isAvailable()));
         actions.put("mute", Boolean.TRUE);
@@ -167,6 +191,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         stopServices();
         agentHttpClient = new AgentHttpClient(this);
         vaultEconomyAdapter = new VaultEconomyAdapter();
+        playerCurrencyAdapter = new PlayerCurrencyAdapter();
         playerPointsAdapter = new PlayerPointsAdapter();
         luckPermsAdapter = new LuckPermsAdapter();
         inventorySnapshotAdapter = new InventorySnapshotAdapter();
@@ -175,6 +200,7 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         startHeartbeatReporter();
         startPlayerSnapshotReporter();
         startChatReporter();
+        startEconomyReporters();
         startLocalControlServer();
     }
 
@@ -194,6 +220,14 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         if (chatReporter != null) {
             chatReporter.stop();
             chatReporter = null;
+        }
+        if (economySnapshotReporter != null) {
+            economySnapshotReporter.stop();
+            economySnapshotReporter = null;
+        }
+        if (economyEventReporter != null) {
+            economyEventReporter.stop();
+            economyEventReporter = null;
         }
         if (localControlServer != null) {
             localControlServer.stop();
@@ -233,6 +267,16 @@ public final class MinecraftMonitorPlugin extends JavaPlugin {
         }
         chatReporter = new ChatReporter(this, agentHttpClient);
         chatReporter.start();
+    }
+
+    private void startEconomyReporters() {
+        if (!isEconomyReportingEnabled()) {
+            return;
+        }
+        economyEventReporter = new EconomyEventReporter(this, agentHttpClient);
+        economyEventReporter.start();
+        economySnapshotReporter = new EconomySnapshotReporter(this, agentHttpClient);
+        economySnapshotReporter.start();
     }
 
     private void startLocalControlServer() {

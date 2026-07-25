@@ -8,40 +8,28 @@ import { computed } from "vue";
 
 const NODE_TINT_PALETTE = [
   {
-    background: "rgba(59, 130, 246, 0.10)",
-    backgroundStrong: "rgba(59, 130, 246, 0.16)",
-    border: "rgba(59, 130, 246, 0.24)",
-    chipBg: "rgba(37, 99, 235, 0.92)"
+    chipBg: "rgba(37, 99, 235, 0.12)",
+    chipColor: "#1d4ed8"
   },
   {
-    background: "rgba(16, 185, 129, 0.10)",
-    backgroundStrong: "rgba(16, 185, 129, 0.16)",
-    border: "rgba(16, 185, 129, 0.24)",
-    chipBg: "rgba(5, 150, 105, 0.92)"
+    chipBg: "rgba(5, 150, 105, 0.12)",
+    chipColor: "#047857"
   },
   {
-    background: "rgba(245, 158, 11, 0.10)",
-    backgroundStrong: "rgba(245, 158, 11, 0.16)",
-    border: "rgba(245, 158, 11, 0.24)",
-    chipBg: "rgba(217, 119, 6, 0.92)"
+    chipBg: "rgba(217, 119, 6, 0.12)",
+    chipColor: "#b45309"
   },
   {
-    background: "rgba(236, 72, 153, 0.10)",
-    backgroundStrong: "rgba(236, 72, 153, 0.16)",
-    border: "rgba(236, 72, 153, 0.24)",
-    chipBg: "rgba(219, 39, 119, 0.92)"
+    chipBg: "rgba(219, 39, 119, 0.12)",
+    chipColor: "#be185d"
   },
   {
-    background: "rgba(139, 92, 246, 0.10)",
-    backgroundStrong: "rgba(139, 92, 246, 0.16)",
-    border: "rgba(139, 92, 246, 0.24)",
-    chipBg: "rgba(124, 58, 237, 0.92)"
+    chipBg: "rgba(124, 58, 237, 0.12)",
+    chipColor: "#6d28d9"
   },
   {
-    background: "rgba(14, 165, 233, 0.10)",
-    backgroundStrong: "rgba(14, 165, 233, 0.16)",
-    border: "rgba(14, 165, 233, 0.24)",
-    chipBg: "rgba(2, 132, 199, 0.92)"
+    chipBg: "rgba(2, 132, 199, 0.12)",
+    chipColor: "#0369a1"
   }
 ];
 
@@ -159,11 +147,8 @@ const getNodeTintStyle = (target: ControlTarget) => {
 
   const tint = NODE_TINT_PALETTE[hash];
   return {
-    "--control-target-card-bg-start": tint.backgroundStrong,
-    "--control-target-card-bg-end": tint.background,
-    "--control-target-card-border": tint.border,
     "--control-target-node-chip-bg": tint.chipBg,
-    "--control-target-node-chip-color": "rgba(255, 255, 255, 0.96)"
+    "--control-target-node-chip-color": tint.chipColor
   };
 };
 </script>
@@ -428,18 +413,15 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__card {
-  border: 1px solid var(--control-target-card-border, rgba(148, 163, 184, 0.18));
-  border-radius: 16px;
+  border: 1px solid rgba(219, 226, 235, 0.92);
+  border-radius: 12px;
   padding: 10px 12px;
-  background: linear-gradient(
-    180deg,
-    var(--control-target-card-bg-start, rgba(248, 250, 252, 0.82)),
-    var(--control-target-card-bg-end, rgba(255, 255, 255, 0.96))
-  );
+  background: rgba(255, 255, 255, 0.9);
   text-align: left;
   cursor: pointer;
   transition:
     transform 0.18s ease,
+    background-color 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease;
   color: inherit;
@@ -447,19 +429,22 @@ const getNodeTintStyle = (target: ControlTarget) => {
 
 .control-target-selector__card:hover {
   transform: translateY(-1px);
-  border-color: rgba(59, 130, 246, 0.26);
-  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+  border-color: rgba(148, 163, 184, 0.58);
+  background: rgba(248, 250, 252, 0.98);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
 }
 
 .control-target-selector__card.is-active {
-  border-color: rgba(59, 130, 246, 0.48);
+  border-color: rgba(37, 99, 235, 0.62);
+  background: rgba(248, 250, 252, 0.98);
   box-shadow:
-    0 14px 28px rgba(59, 130, 246, 0.12),
-    inset 0 0 0 1px rgba(59, 130, 246, 0.22);
+    0 10px 22px rgba(37, 99, 235, 0.08),
+    inset 3px 0 0 rgba(37, 99, 235, 0.78);
 }
 
 .control-target-selector__card.is-batch-selected {
   border-color: rgba(37, 99, 235, 0.62);
+  background: rgba(239, 246, 255, 0.72);
   box-shadow:
     0 12px 26px rgba(37, 99, 235, 0.1),
     inset 0 0 0 2px rgba(37, 99, 235, 0.2);
@@ -521,6 +506,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
   text-overflow: ellipsis;
   color: var(--control-target-node-chip-color, var(--color-blue-7));
   background: var(--control-target-node-chip-bg, rgba(59, 130, 246, 0.12));
+  border: 1px solid rgba(255, 255, 255, 0.36);
 }
 
 .control-target-selector__target-identity {
@@ -577,7 +563,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__target-icon {
-  color: var(--color-blue-6);
+  color: var(--color-gray-8);
   font-size: 16px;
 }
 </style>

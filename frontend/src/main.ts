@@ -18,9 +18,23 @@ const getHashPath = () => {
   return rawHash.split("?")[0] || "/";
 };
 
-const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/gm/chat", "/players"]);
+const STANDALONE_PREVIEW_PATHS = new Set(["/control", "/gm", "/gm/chat", "/players", "/economy"]);
 
 const isStandalonePreviewEntry = () => STANDALONE_PREVIEW_PATHS.has(getHashPath());
+
+const isStandalonePreviewForced = () => {
+  const rawHash = window.location.hash.replace(/^#/, "");
+  const hashQuery = rawHash.split("?")[1] || "";
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(hashQuery);
+  const previewValue =
+    searchParams.get("preview") ||
+    searchParams.get("localPreview") ||
+    hashParams.get("preview") ||
+    hashParams.get("localPreview");
+
+  return ["1", "true", "local", "mock"].includes(String(previewValue || "").toLowerCase());
+};
 
 const isBackendUnavailableError = (error: any) => {
   const message = String(error?.message || error).toLowerCase();
@@ -45,6 +59,11 @@ async function initStandalonePreview() {
 
 async function initApp() {
   try {
+    if (isStandalonePreviewEntry() && isStandalonePreviewForced()) {
+      await initStandalonePreview();
+      return;
+    }
+
     const { state, updatePanelStatus } = useAppStateStore();
     setLoadingTitle("Initializing Application...");
     await updatePanelStatus();

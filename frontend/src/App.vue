@@ -59,8 +59,13 @@ const showBottomNav = computed(
 
 onMounted(async () => {
   setLoadingTitle("Loading application settings...");
-  await initAppTheme();
-  closeAppLoading();
+  try {
+    await initAppTheme();
+  } catch (error) {
+    console.error("Failed to initialize application theme:", error);
+  } finally {
+    closeAppLoading();
+  }
 });
 </script>
 

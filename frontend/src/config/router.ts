@@ -3,6 +3,7 @@ import { useAppStateStore } from "@/stores/useAppStateStore";
 import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
 import type { LoginUserInfo } from "@/types/user";
 import ControlConsole from "@/views/ControlConsole.vue";
+import EconomyConsole from "@/views/EconomyConsole.vue";
 import GMConsole from "@/views/GMConsole.vue";
 import InstallPage from "@/views/Install.vue";
 import LayoutContainer from "@/views/LayoutContainer.vue";
@@ -128,6 +129,17 @@ const originRouterConfig: RouterConfig[] = [
     path: "/gm",
     name: t("TXT_CODE_GM_MANAGEMENT"),
     component: GMConsole,
+    meta: {
+      permission: ROLE.ADMIN,
+      mainMenu: true,
+      chromeMode: "minimal",
+      desktopChromeMode: "top-nav"
+    }
+  },
+  {
+    path: "/economy",
+    name: t("TXT_CODE_ECONOMY_TITLE"),
+    component: EconomyConsole,
     meta: {
       permission: ROLE.ADMIN,
       mainMenu: true,

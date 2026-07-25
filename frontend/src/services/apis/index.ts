@@ -340,6 +340,56 @@ export const gmAuditApi = useDefineApi<
   method: "GET"
 });
 
+export const economyOverviewApi = useDefineApi<
+  {
+    params: {
+      daemonId?: string;
+      instanceId?: string;
+      currencyType?: string;
+      startAt?: string;
+      endAt?: string;
+    };
+  },
+  IMcsmEconomyOverviewResponse
+>({
+  url: "/api/economy/overview",
+  method: "GET"
+});
+
+export const economyTransactionsApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+      currencyType?: string;
+      playerUuid?: string;
+      category?: string;
+      source?: string;
+      startAt?: string;
+      endAt?: string;
+      limit?: number;
+      offset?: number;
+    };
+  },
+  IMcsmEconomyTransactionsResponse
+>({
+  url: "/api/economy/transactions",
+  method: "GET"
+});
+
+export const economyCurrenciesApi = useDefineApi<
+  {
+    params: {
+      daemonId: string;
+      instanceId: string;
+    };
+  },
+  IMcsmEconomyCurrenciesResponse
+>({
+  url: "/api/economy/currencies",
+  method: "GET"
+});
+
 export const editNode = useDefineApi<
   {
     params: {

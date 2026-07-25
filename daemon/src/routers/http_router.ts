@@ -7,6 +7,7 @@ import { globalConfiguration } from "../entity/config";
 import FileWriter from "../entity/file_writer";
 import { $t } from "../i18n";
 import { missionPassport } from "../service/mission_passport";
+import economyService from "../service/economy_service";
 import gmService from "../service/gm_service";
 import monitorService from "../service/monitor_service";
 import FileManager from "../service/system_file";
@@ -79,6 +80,14 @@ router.post("/v1/plugin/chat_message", async (ctx) => {
 
 router.post("/v1/plugin/gm/chat-message", async (ctx) => {
   await handlePluginBody(ctx, (body) => gmService.recordChatMessage(body));
+});
+
+router.post("/v1/plugin/economy_event", async (ctx) => {
+  await handlePluginBody(ctx, (body) => economyService.recordEvent(body));
+});
+
+router.post("/v1/plugin/economy_snapshot", async (ctx) => {
+  await handlePluginBody(ctx, (body) => economyService.recordSnapshot(body));
 });
 
 router.get("/v1/plugin/token/:serverId", async (ctx) => {
