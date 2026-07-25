@@ -20,6 +20,11 @@ export default class RemoteService {
   constructor(uuid: string, config: RemoteServiceConfig) {
     this.uuid = uuid;
     this.config = config;
+    this.config.tlsVerify = this.config.tlsVerify !== false;
+    this.config.connectOpts = {
+      ...this.config.connectOpts,
+      rejectUnauthorized: this.config.tlsVerify
+    };
   }
 
   private getDaemonInfo() {
@@ -28,6 +33,7 @@ export default class RemoteService {
 
   public connect(connectOpts?: Partial<SocketOptions & ManagerOptions>) {
     if (connectOpts) this.config.connectOpts = connectOpts;
+    this.config.connectOpts.rejectUnauthorized = this.config.tlsVerify;
     // Start the formal connection to the remote Socket program
     let addr = `ws://${this.config.ip}:${this.config.port}`;
     if (this.config.ip.indexOf("wss://") === 0 || this.config.ip.indexOf("ws://") === 0) {

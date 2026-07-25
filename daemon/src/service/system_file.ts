@@ -21,6 +21,27 @@ interface IFile {
   mode: number;
 }
 
+async function inspectTree(root: string) {
+  let entries = 0;
+  let bytes = 0;
+  const pending = [root];
+  while (pending.length) {
+    const current = pending.pop()!;
+    const children = await fs.readdir(current, { withFileTypes: true });
+    for (const child of children) {
+      const childPath = path.join(current, child.name);
+      entries += 1;
+      if (child.isDirectory()) {
+        pending.push(childPath);
+        continue;
+      }
+      const stat = await fs.lstat(childPath);
+      bytes += stat.size;
+    }
+  }
+  return { entries, bytes };
+}
+
 export default class FileManager {
   public cwd: string = ".";
 
@@ -263,7 +284,25 @@ export default class FileManager {
     if (!code) code = this.fileCode;
     if (!this.check(sourceZip) || !this.checkPath(destDir)) throw new Error(ERROR_MSG_01);
     this.zipFileCheck(this.toAbsolutePath(sourceZip));
-    return await decompress(this.toAbsolutePath(sourceZip), this.toAbsolutePath(destDir), code);
+    const destination = this.toAbsolutePath(destDir);
+    const temporary = path.join(
+      path.dirname(destination),
+      `.mcsm-unzip-${process.pid}-${Date.now()}`
+    );
+    await fs.ensureDir(temporary);
+    try {
+      const result = await decompress(this.toAbsolutePath(sourceZip), temporary, code);
+      const usage = await inspectTree(temporary);
+      const maxEntries = Number(globalConfiguration.config.maxArchiveEntries) || 0;
+      const maxBytes = Number(globalConfiguration.config.maxArchiveUncompressedBytes) || 0;
+      if ((maxEntries > 0 && usage.entries > maxEntries) || (maxBytes > 0 && usage.bytes > maxBytes)) {
+        throw new Error("Archive exceeds the configured extraction limits.");
+      }
+      await fs.copy(temporary, destination, { overwrite: true, errorOnExist: false });
+      return result;
+    } finally {
+      await fs.remove(temporary).catch(() => {});
+    }
   }
 
   async zip(sourceZip: string, files: string[], code?: string) {

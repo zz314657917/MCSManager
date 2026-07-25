@@ -240,7 +240,8 @@ router.post(
       port: parameter.port,
       ip: parameter.ip,
       prefix: parameter.prefix ?? "",
-      remarks: parameter.remarks ?? ""
+      remarks: parameter.remarks ?? "",
+      tlsVerify: parameter.tlsVerify !== false
     });
 
     operationLogger.log("daemon_create", {
@@ -280,7 +281,8 @@ router.put(
       prefix: parameter.prefix ?? "",
       apiKey: parameter.apiKey,
       remarks: parameter.remarks,
-      remoteMappings: parameter.remoteMappings ?? []
+      remoteMappings: parameter.remoteMappings ?? [],
+      tlsVerify: parameter.tlsVerify !== false
     });
 
     operationLogger.log("daemon_config_change", {

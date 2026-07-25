@@ -30,6 +30,10 @@ class Config {
   public downloadSpeedRate = 0;
   // default: 1, if set 0 => Unlimited
   public maxDownloadFromUrlFileCount = 1;
+  // Reject remote downloads and decompression jobs that exceed these limits.
+  public maxRemoteDownloadBytes = 2 * 1024 * 1024 * 1024;
+  public maxArchiveEntries = 100000;
+  public maxArchiveUncompressedBytes = 8 * 1024 * 1024 * 1024;
 
   // Output buffer size (number of chunks) for instance terminal output.
   // Each chunk is up to 256 characters, flushed every 50ms.

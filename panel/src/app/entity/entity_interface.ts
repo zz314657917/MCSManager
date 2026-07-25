@@ -60,6 +60,7 @@ export interface IRemoteService {
   remarks?: string;
   apiKey?: string;
   remoteMappings?: RemoteMappingEntry[];
+  tlsVerify?: boolean;
 }
 
 // @Entity
@@ -70,6 +71,7 @@ export class RemoteServiceConfig {
   public remarks = "";
   public apiKey = "";
   public remoteMappings: RemoteMappingEntry[] = [];
+  public tlsVerify = true;
 
   connectOpts: Partial<SocketOptions & ManagerOptions> = {
     multiplex: false,
@@ -77,7 +79,7 @@ export class RemoteServiceConfig {
     timeout: 1000 * 10,
     reconnection: true,
     reconnectionAttempts: 10,
-    rejectUnauthorized: false
+    rejectUnauthorized: true
   };
 
   /**

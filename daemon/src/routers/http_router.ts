@@ -26,6 +26,14 @@ router.all("/", async (ctx) => {
 });
 
 router.get("/metrics", async (ctx) => {
+  const requestKey = String(ctx.request.header["x-request-api-key"] || "");
+  const authorization = String(ctx.request.header.authorization || "");
+  const bearerKey = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+  if (requestKey !== globalConfiguration.config.key && bearerKey !== globalConfiguration.config.key) {
+    ctx.status = 401;
+    ctx.body = "Unauthorized";
+    return;
+  }
   ctx.type = "text/plain; version=0.0.4; charset=utf-8";
   ctx.body = monitorService.renderPrometheusMetrics();
   ctx.status = 200;

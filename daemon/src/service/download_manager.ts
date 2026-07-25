@@ -1,6 +1,10 @@
 import axios from "axios";
+import dns from "dns";
 import { createWriteStream } from "fs";
 import fs from "fs-extra";
+import http from "http";
+import https from "https";
+import net from "net";
 import path from "path";
 import { Throttle } from "stream-throttle";
 import { getCommonHeaders } from "../common/network";
@@ -10,6 +14,72 @@ export const DOWNLOAD_STATUS = {
   DOWNLOADING: 0,
   COMPLETED: 1,
   ERROR: 2
+};
+
+const MAX_REDIRECTS = 5;
+
+function isUnsafeAddress(address: string) {
+  const normalized = address.toLowerCase();
+  if (net.isIP(normalized) === 4) {
+    const parts = normalized.split(".").map(Number);
+    const [first, second] = parts;
+    return (
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      (first === 100 && second >= 64 && second <= 127) ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168) ||
+      (first === 198 && (second === 18 || second === 19 || second === 51)) ||
+      (first === 203 && second === 0) ||
+      first >= 224
+    );
+  }
+
+  if (net.isIP(normalized) === 6) {
+    if (normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice(7);
+      if (net.isIP(mapped) === 4) return isUnsafeAddress(mapped);
+    }
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") ||
+      normalized.startsWith("fea") ||
+      normalized.startsWith("feb")
+    );
+  }
+
+  return true;
+}
+
+async function assertSafeUrl(rawUrl: string) {
+  const parsed = new URL(rawUrl);
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Only http and https download URLs are allowed.");
+  }
+  if (parsed.username || parsed.password) throw new Error("Download URL credentials are not allowed.");
+
+  const records = await dns.promises.lookup(parsed.hostname, { all: true, verbatim: true });
+  if (!records.length || records.some((record) => isUnsafeAddress(record.address))) {
+    throw new Error(`Download target resolves to a private or reserved address: ${parsed.hostname}`);
+  }
+  return parsed;
+}
+
+const safeLookup: any = (hostname: string, _options: any, callback: Function) => {
+  dns.promises
+    .lookup(hostname, { all: true, verbatim: true })
+    .then((records) => {
+      const record = records.find((item) => !isUnsafeAddress(item.address));
+      if (!record) throw new Error("Download target resolved to a private or reserved address.");
+      callback(null, record.address, record.family);
+    })
+    .catch((error) => callback(error));
 };
 
 interface DownloadTask {
@@ -53,6 +123,10 @@ class DownloadManager {
 
       const response = await this.requestWithRetry(url, controller);
       const total = parseInt(response.headers["content-length"] || "0");
+      const maxBytes = Number(globalConfiguration.config.maxRemoteDownloadBytes) || 0;
+      if (maxBytes > 0 && total > maxBytes) {
+        throw new Error(`Remote download exceeds the ${maxBytes} byte limit.`);
+      }
       let current = 0;
       const stream = response.data;
       const writeStream = createWriteStream(targetPath);
@@ -63,6 +137,7 @@ class DownloadManager {
         const onError = (err: Error) => {
           stream.destroy();
           writeStream.destroy();
+          fs.remove(targetPath).catch(() => {});
           const activeTask = this.tasks.find((t) => t.id === taskId);
           if (activeTask) {
             activeTask.status = DOWNLOAD_STATUS.ERROR;
@@ -93,6 +168,10 @@ class DownloadManager {
 
         stream.on("data", (chunk: any) => {
           current += chunk.length;
+          if (maxBytes > 0 && current > maxBytes) {
+            stream.destroy(new Error(`Remote download exceeds the ${maxBytes} byte limit.`));
+            return;
+          }
           const activeTask = this.tasks.find((t) => t.id === taskId);
           if (!activeTask) return;
           activeTask.current = current;
@@ -161,18 +240,44 @@ class DownloadManager {
   private async requestWithRetry(
     url: string,
     controller: AbortController,
-    retries = 2
+    retries = 2,
+    redirects = 0,
+    visited = new Set<string>()
   ): Promise<any> {
     try {
-      return await axios({
+      const safeUrl = await assertSafeUrl(url);
+      const normalizedUrl = safeUrl.toString();
+      if (visited.has(normalizedUrl)) throw new Error("Download redirect loop detected.");
+      visited.add(normalizedUrl);
+
+      const response = await axios({
         method: "get",
-        url: url,
+        url: normalizedUrl,
         responseType: "stream",
         timeout: 60000,
-        headers: getCommonHeaders(url),
-        maxRedirects: 10,
+        headers: getCommonHeaders(normalizedUrl),
+        maxRedirects: 0,
+        validateStatus: (status) => status >= 200 && status < 400,
+        httpAgent: new http.Agent({ lookup: safeLookup }),
+        httpsAgent: new https.Agent({ lookup: safeLookup }),
         signal: controller.signal
       });
+
+      if (response.status >= 300) {
+        const location = response.headers.location;
+        if (!location || redirects >= MAX_REDIRECTS) {
+          throw new Error("Download redirect limit exceeded or location is missing.");
+        }
+        response.data?.destroy();
+        return await this.requestWithRetry(
+          new URL(location, safeUrl).toString(),
+          controller,
+          retries,
+          redirects + 1,
+          visited
+        );
+      }
+      return response;
     } catch (err: any) {
       if (controller.signal.aborted) throw err;
 

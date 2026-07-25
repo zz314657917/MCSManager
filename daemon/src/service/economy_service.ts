@@ -1,7 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
 import initSqlJs, { Database, SqlJsStatic } from "sql.js";
-import { globalConfiguration } from "../entity/config";
 import monitorService from "./monitor_service";
 import InstanceSubsystem from "./system_instance";
 
@@ -261,7 +260,7 @@ class EconomyService {
     }
     const instance = this.getInstanceOrThrow(serverId);
     const expectedToken = monitorService.getExpectedToken(serverId);
-    if (instanceToken !== expectedToken && instanceToken !== globalConfiguration.config.key) {
+    if (instanceToken !== expectedToken) {
       const error: any = new Error("instanceToken is invalid.");
       error.status = 403;
       throw error;

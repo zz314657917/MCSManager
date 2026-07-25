@@ -136,6 +136,23 @@ _  /  / / / /___  ____/ /_  /  / / / /_/ /_  / / / /_/ /_  /_/ //  __/  /
     // When Koa is attacked by a short connection flood, it is easy for error messages to swipe the screen, which may indirectly affect the operation of some applications
   });
 
+  app.keys = [v4()];
+  app.use(
+    session(
+      {
+        key: v4(),
+        maxAge: 86400000,
+        overwrite: true,
+        httpOnly: true,
+        signed: true,
+        rolling: false,
+        renew: false,
+        secure: false
+      },
+      app
+    )
+  );
+
   app.use(preCheckMiddleware);
   app.use(
     koaBody({
@@ -155,23 +172,6 @@ _  /  / / / /___  ____/ /_  /  / / / /_/ /_  / / / /_/ /_  /_/ //  __/  /
         logger.error("koaBody Lib Error:", err);
       }
     })
-  );
-
-  app.keys = [v4()];
-  app.use(
-    session(
-      {
-        key: v4(),
-        maxAge: 86400000,
-        overwrite: true,
-        httpOnly: true,
-        signed: true,
-        rolling: false,
-        renew: false,
-        secure: false
-      },
-      app
-    )
   );
 
   app.use(async (ctx, next) => {

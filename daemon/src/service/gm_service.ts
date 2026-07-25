@@ -2,7 +2,6 @@ import fs from "fs-extra";
 import http from "http";
 import https from "https";
 import path from "path";
-import { globalConfiguration } from "../entity/config";
 import Instance from "../entity/instance/instance";
 import monitorService from "./monitor_service";
 import InstanceSubsystem from "./system_instance";
@@ -92,11 +91,9 @@ const normalizeChatPluginType = (supports?: AnyRecord): IMcsmGmChatPluginType =>
 const INVENTORY_SECTIONS = new Set(["hotbar", "main", "armor", "offhand"]);
 
 const normalizeControllerHost = (value: unknown) => {
-  const host = normalizeText(value);
-  if (!host || host === "0.0.0.0" || host === "::" || host === "::1") {
-    return "127.0.0.1";
-  }
-  return host;
+  // The controller is hosted by the Minecraft plugin on the same machine as this Daemon.
+  // Never trust a host supplied by the plugin payload as an outbound destination.
+  return "127.0.0.1";
 };
 
 class GmService {
@@ -127,7 +124,7 @@ class GmService {
 
     const instance = this.getInstanceOrThrow(serverId);
     const expectedToken = monitorService.getExpectedToken(serverId);
-    if (instanceToken !== expectedToken && instanceToken !== globalConfiguration.config.key) {
+    if (instanceToken !== expectedToken) {
       const error: any = new Error("instanceToken is invalid.");
       error.status = 403;
       throw error;
@@ -171,7 +168,7 @@ class GmService {
       chatPluginAvailable: Boolean(supports.chatReporting),
       chatPluginType: normalizeChatPluginType(supports),
       controller:
-        controllerEnabled && controllerPort > 0
+        controllerEnabled && controllerPort > 0 && controllerPort <= 65535
           ? {
               host: controllerHost,
               port: controllerPort

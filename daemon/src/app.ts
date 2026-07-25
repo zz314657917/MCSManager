@@ -150,7 +150,7 @@ let appHost = $t("TXT_CODE_app.host", { port: config.port });
 if (config.ssl) appHost = appHost.replace("http", "https");
 logger.info(appHost);
 logger.info($t("TXT_CODE_app.configPathTip", { path: "" }));
-logger.info($t("TXT_CODE_app.password", { key: config.key }));
+logger.info("Daemon access key is configured and will not be printed to logs.");
 logger.info($t("TXT_CODE_app.passwordTip"));
 logger.info($t("TXT_CODE_app.exitTip"));
 logger.info("----------------------------");
