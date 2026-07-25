@@ -1,8 +1,8 @@
-import fs from "fs-extra";
 import path from "path";
-import initSqlJs, { Database, SqlJsStatic } from "sql.js";
+import initSqlJs, { SqlJsStatic } from "sql.js";
 import monitorService from "./monitor_service";
 import InstanceSubsystem from "./system_instance";
+import { EconomyDatabase } from "./economy_database";
 
 type AnyRecord = Record<string, any>;
 
@@ -109,114 +109,9 @@ const parseReasonMeta = (reason: string) => {
   return meta;
 };
 
-class EconomyDatabase {
-  private db?: Database;
-  private dirty = false;
-  private flushTimer?: NodeJS.Timeout;
-
-  constructor(
-    private readonly SQL: SqlJsStatic,
-    private readonly filePath: string
-  ) {}
-
-  private async open() {
-    if (this.db) return this.db;
-    await fs.ensureDir(path.dirname(this.filePath));
-    if (await fs.pathExists(this.filePath)) {
-      this.db = new this.SQL.Database(await fs.readFile(this.filePath));
-    } else {
-      this.db = new this.SQL.Database();
-    }
-    this.migrate(this.db);
-    return this.db;
-  }
-
-  private migrate(db: Database) {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS economy_transactions (
-        id TEXT PRIMARY KEY,
-        server_id TEXT NOT NULL,
-        instance_id TEXT NOT NULL,
-        player_uuid TEXT NOT NULL,
-        player_name TEXT,
-        currency_type TEXT NOT NULL,
-        currency_name TEXT,
-        delta INTEGER NOT NULL,
-        balance_after INTEGER NOT NULL,
-        operator_name TEXT,
-        operator_reason TEXT,
-        category TEXT NOT NULL,
-        source TEXT,
-        reference_id TEXT,
-        occurred_at TEXT NOT NULL,
-        received_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS economy_currencies (
-        type TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        total_balance INTEGER NOT NULL DEFAULT 0,
-        player_count INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT
-      );
-      CREATE TABLE IF NOT EXISTS economy_provider_status (
-        provider TEXT PRIMARY KEY,
-        status_text TEXT NOT NULL,
-        available INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_economy_time ON economy_transactions(occurred_at);
-      CREATE INDEX IF NOT EXISTS idx_economy_currency_time ON economy_transactions(currency_type, occurred_at);
-      CREATE INDEX IF NOT EXISTS idx_economy_player_time ON economy_transactions(player_uuid, occurred_at);
-      CREATE INDEX IF NOT EXISTS idx_economy_category_time ON economy_transactions(category, occurred_at);
-    `);
-    this.markDirty();
-  }
-
-  private markDirty() {
-    this.dirty = true;
-    if (this.flushTimer) return;
-    this.flushTimer = setTimeout(() => {
-      this.flush().catch(() => undefined);
-    }, 250);
-    if (typeof this.flushTimer.unref === "function") this.flushTimer.unref();
-  }
-
-  async flush() {
-    if (!this.db || !this.dirty) return;
-    this.dirty = false;
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = undefined;
-    }
-    await fs.writeFile(this.filePath, Buffer.from(this.db.export()));
-  }
-
-  async run(sql: string, params: any[] = []) {
-    const db = await this.open();
-    db.run(sql, params);
-    this.markDirty();
-  }
-
-  async query<T = AnyRecord>(sql: string, params: any[] = []): Promise<T[]> {
-    const db = await this.open();
-    const stmt = db.prepare(sql, params);
-    const rows: T[] = [];
-    try {
-      while (stmt.step()) rows.push(stmt.getAsObject() as T);
-    } finally {
-      stmt.free();
-    }
-    return rows;
-  }
-
-  async get<T = AnyRecord>(sql: string, params: any[] = []) {
-    return (await this.query<T>(sql, params))[0];
-  }
-}
-
 class EconomyService {
   private sqlPromise?: Promise<SqlJsStatic>;
-  private readonly dbMap = new Map<string, EconomyDatabase>();
+  private readonly dbMap = new Map<string, Promise<EconomyDatabase>>();
   private readonly rootDir = path.join(process.cwd(), "data", "EconomyData");
 
   private getSql() {
@@ -227,14 +122,16 @@ class EconomyService {
   }
 
   private async getDb(instanceId: string) {
-    if (!this.dbMap.has(instanceId)) {
-      const SQL = await this.getSql();
-      this.dbMap.set(
-        instanceId,
-        new EconomyDatabase(SQL, path.join(this.rootDir, instanceId, "economy.sqlite"))
-      );
-    }
-    return this.dbMap.get(instanceId)!;
+    const existing = this.dbMap.get(instanceId);
+    if (existing) return existing;
+    const databasePromise = this.getSql().then(
+      (SQL) => new EconomyDatabase(SQL, path.join(this.rootDir, instanceId, "economy.sqlite"))
+    );
+    this.dbMap.set(instanceId, databasePromise);
+    databasePromise.catch(() => {
+      if (this.dbMap.get(instanceId) === databasePromise) this.dbMap.delete(instanceId);
+    });
+    return databasePromise;
   }
 
   private getInstanceOrThrow(instanceId: string) {
@@ -378,40 +275,64 @@ class EconomyService {
     };
 
     const db = await this.getDb(serverId);
-    await db.run(
-      `INSERT OR IGNORE INTO economy_transactions
-       (id, server_id, instance_id, player_uuid, player_name, currency_type, currency_name, delta,
-        balance_after, operator_name, operator_reason, category, source, reference_id, occurred_at, received_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        row.id,
-        row.serverId,
-        row.instanceId,
-        row.playerUuid,
-        row.playerName,
-        row.currencyType,
-        row.currencyName,
-        row.delta,
-        row.balanceAfter,
-        row.operatorName,
-        row.operatorReason,
-        row.category,
-        row.source,
-        row.referenceId,
-        row.occurredAt,
-        row.receivedAt
-      ]
-    );
+    let existingTransactionId = "";
+    if (row.referenceId) {
+      const existing = await db.get<AnyRecord>(
+        "SELECT id FROM economy_transactions WHERE server_id = ? AND reference_id = ?",
+        [row.serverId, row.referenceId]
+      );
+      if (existing?.id) {
+        existingTransactionId = String(existing.id);
+      }
+    }
+    if (!existingTransactionId) {
+      await db.run(
+        `INSERT OR IGNORE INTO economy_transactions
+         (id, server_id, instance_id, player_uuid, player_name, currency_type, currency_name, delta,
+          balance_after, operator_name, operator_reason, category, source, reference_id, occurred_at, received_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          row.id,
+          row.serverId,
+          row.instanceId,
+          row.playerUuid,
+          row.playerName,
+          row.currencyType,
+          row.currencyName,
+          row.delta,
+          row.balanceAfter,
+          row.operatorName,
+          row.operatorReason,
+          row.category,
+          row.source,
+          row.referenceId,
+          row.occurredAt,
+          row.receivedAt
+        ]
+      );
+    }
     await db.run(
       `INSERT INTO economy_currencies(type, name, total_balance, player_count, updated_at)
        VALUES (?, ?, 0, 0, ?)
-       ON CONFLICT(type) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
+       ON CONFLICT(type) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at
+       WHERE economy_currencies.updated_at IS NULL
+          OR excluded.updated_at >= economy_currencies.updated_at`,
       [currencyType, currencyName, receivedAt]
     );
 
+    const persisted = existingTransactionId
+      ? { id: existingTransactionId }
+      : row.referenceId
+      ? await db.get<AnyRecord>(
+          "SELECT id FROM economy_transactions WHERE server_id = ? AND reference_id = ?",
+          [row.serverId, row.referenceId]
+        )
+      : undefined;
+
     return {
       accepted: true,
-      transactionId: row.id,
+      duplicate: Boolean(existingTransactionId || (persisted && String(persisted.id) !== row.id)),
+      transactionId: String(persisted?.id || row.id),
       serverId,
       currencyType,
       receivedAt
@@ -434,7 +355,9 @@ class EconomyService {
        ON CONFLICT(provider) DO UPDATE SET
          status_text = excluded.status_text,
          available = excluded.available,
-         updated_at = excluded.updated_at`,
+         updated_at = excluded.updated_at
+       WHERE economy_provider_status.updated_at IS NULL
+          OR excluded.updated_at >= economy_provider_status.updated_at`,
       [provider, providerStatus, providerStatus === "available" ? 1 : 0, updatedAt]
     );
     for (const item of currencies) {
@@ -447,7 +370,9 @@ class EconomyService {
            name = excluded.name,
            total_balance = excluded.total_balance,
            player_count = excluded.player_count,
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at
+         WHERE economy_currencies.updated_at IS NULL
+            OR excluded.updated_at >= economy_currencies.updated_at`,
         [
           type,
           name,
