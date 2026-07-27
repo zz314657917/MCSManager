@@ -163,9 +163,11 @@ defineExpose({ isPhone });
   justify-content: space-between;
   gap: 16px;
   padding: 18px 24px;
-  background: linear-gradient(135deg, rgba(7, 16, 31, 0.95), rgba(17, 34, 62, 0.9));
-  color: var(--color-always-white);
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.16);
+  border-bottom: 1px solid var(--design-hairline);
+  background: rgba(247, 247, 244, 0.94);
+  color: var(--design-ink);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
 }
 
 .ops-page-shell__header-left,
@@ -190,7 +192,7 @@ defineExpose({ isPhone });
 }
 
 .ops-page-shell__eyebrow {
-  opacity: 0.78;
+  color: var(--design-muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -200,7 +202,7 @@ defineExpose({ isPhone });
   margin: 4px 0 0;
   font-size: 28px;
   line-height: 1.1;
-  color: var(--color-always-white);
+  color: var(--design-ink);
 }
 
 .ops-page-shell__shell {

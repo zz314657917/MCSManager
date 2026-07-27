@@ -286,6 +286,17 @@ const createPreviewData = (): PreviewServerRecord[] => {
           time: minutesAgo(7)
         },
         {
+          id: "survival-msg-1-1",
+          daemonId: survival.daemonId,
+          instanceId: survival.instanceId,
+          playerUuid: "preview-player-3",
+          playerName: "落叶",
+          senderType: "player",
+          channel: "global",
+          text: "我在主城补药水，5 分钟后可以出发。",
+          time: minutesAgo(6)
+        },
+        {
           id: "survival-msg-2",
           daemonId: survival.daemonId,
           instanceId: survival.instanceId,
@@ -296,6 +307,14 @@ const createPreviewData = (): PreviewServerRecord[] => {
           mentionedPlayers: ["爱马仕"],
           text: "高价收下界合金锭，支持点券交易。",
           time: minutesAgo(5)
+        },
+        {
+          id: "survival-msg-2-1",
+          daemonId: survival.daemonId,
+          instanceId: survival.instanceId,
+          senderType: "system",
+          text: "PlayerChat：检测到连续重复内容，已降低该玩家消息频率。",
+          time: minutesAgo(4)
         },
         {
           id: "survival-msg-3",
@@ -312,6 +331,17 @@ const createPreviewData = (): PreviewServerRecord[] => {
           senderType: "gm",
           text: "GM 已处理刷屏玩家，请继续正常交流。",
           time: minutesAgo(2)
+        },
+        {
+          id: "survival-msg-5",
+          daemonId: survival.daemonId,
+          instanceId: survival.instanceId,
+          playerUuid: "preview-player-1",
+          playerName: "爱马仕",
+          senderType: "player",
+          channel: "global",
+          text: "收到，等会我把龙战利品放到公会仓库。",
+          time: minutesAgo(1)
         }
       ]
     },
@@ -554,7 +584,7 @@ export function useGmConsolePreviewState() {
   const selectedServerKey = ref(
     servers.value.length ? createGmServerKey(servers.value[0].daemonId, servers.value[0].instanceId) : ""
   );
-  const selectedPlayerUuid = ref("");
+  const selectedPlayerUuid = ref(previewRecords[0]?.players[0]?.presence.playerUuid || "");
 
   const currentServer = computed(() =>
     servers.value.find((item) => createGmServerKey(item.daemonId, item.instanceId) === selectedServerKey.value)

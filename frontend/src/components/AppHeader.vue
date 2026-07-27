@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import logo from "@/assets/logo.png";
-import { useHeaderMenus } from "@/hooks/useHeaderMenus";
+import { isMenuRouteActive, useHeaderMenus } from "@/hooks/useHeaderMenus";
 import { useScreen } from "@/hooks/useScreen";
 import { useAppConfigStore } from "@/stores/useAppConfigStore";
 import { useLayoutContainerStore } from "@/stores/useLayoutContainerStore";
@@ -15,13 +15,6 @@ const { containerState } = useLayoutContainerStore();
 const { logoImage } = useAppConfigStore();
 
 const { menus, appMenus, handleToPage } = useHeaderMenus();
-
-/** Whether route menu item is active (current path equals or is child of this path) */
-const isRouteActive = (path: string): boolean => {
-  if (route.path === path) return true;
-  if (path === "/") return false;
-  return route.path.startsWith(path + "/");
-};
 
 const { y } = useScroll(document.body);
 
@@ -42,6 +35,14 @@ const useWideDesktopHeader = computed(
 const desktopHeaderMenus = computed(() => {
   return menus.value.filter((item) => item.path !== "/instances");
 });
+
+const isRouteActive = (path: string): boolean => {
+  return isMenuRouteActive(
+    route.path,
+    path,
+    desktopHeaderMenus.value.map((item) => item.path)
+  );
+};
 
 const openPhoneMenu = (b = false) => {
   containerState.showPhoneMenu = b;
@@ -208,12 +209,13 @@ const openPhoneMenu = (b = false) => {
 .phone-menu {
   .phone-menu-btn {
     padding: 16px 8px;
-    border-bottom: 1px solid var(--color-gray-4);
-    color: var(--color-gray-12);
+    border-bottom: 1px solid var(--design-hairline);
+    color: var(--design-ink);
   }
 
   .phone-menu-btn-active {
-    background-color: rgba(64, 156, 216, 0.12);
+    background-color: rgba(245, 78, 0, 0.1);
+    color: var(--design-primary);
   }
 }
 
@@ -230,7 +232,7 @@ const openPhoneMenu = (b = false) => {
     margin-top: 8px;
 
     button {
-      color: var(--color-always-white) !important;
+      color: var(--app-header-text-color) !important;
     }
   }
 
@@ -241,14 +243,15 @@ const openPhoneMenu = (b = false) => {
 }
 
 .app-header-wrapper {
-  box-shadow: 0 2px 4px 0 var(--card-shadow-color);
-  background-image: url("@/assets/side.png");
+  border-bottom: 1px solid var(--design-hairline);
+  box-shadow: none;
+  background-image: none;
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: var(--app-header-bg);
-  backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(120%) blur(12px);
   color: var(--app-header-text-color);
 
   position: fixed;
@@ -287,13 +290,18 @@ const openPhoneMenu = (b = false) => {
   .nav-button {
     margin: 0 4px;
     font-size: 14px;
-    transition: all 0.4s;
+    font-weight: 500;
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease,
+      border-color 0.18s ease;
     color: var(--app-header-text-color) !important;
     text-align: center;
     padding: 8px 12px;
     min-width: 40px;
     cursor: pointer;
-    border-radius: 6px;
+    border: 1px solid transparent;
+    border-radius: var(--design-radius-md);
     user-select: none;
   }
 
@@ -307,11 +315,15 @@ const openPhoneMenu = (b = false) => {
     font-size: 16px !important;
   }
   .nav-button:hover {
-    background-color: rgba(215, 215, 215, 0.261);
+    border-color: var(--design-hairline);
+    background-color: var(--design-surface-card);
+    color: var(--design-primary) !important;
   }
 
   .nav-button-active {
-    background-color: rgba(215, 215, 215, 0.35);
+    border-color: rgba(245, 78, 0, 0.24);
+    background-color: rgba(245, 78, 0, 0.1);
+    color: var(--design-primary) !important;
   }
 
   .logo {

@@ -1,31 +1,31 @@
 .app-light-theme {
   @extend .app-light-base-color;
 
-  --background-color: rgb(245, 245, 245);
-  --background-color-white: var(--color-gray-1);
-  --drag-background-color: rgb(212, 212, 212);
-  --new-card-list-background-color: rgba(201, 200, 200, 0.2);
-  --new-card-list-background-color-menu: rgba(255, 255, 255, 0.8);
-  --float-box-bg-color: rgba(235, 235, 235, 0.2);
-  --gray-border-color: var(--color-gray-10);
-  --bottom-nav-background-color: rgb(255, 255, 255);
-  --bottom-nav-background-color-hover: rgba(167, 162, 162, 0.26);
+  --background-color: var(--design-canvas);
+  --background-color-white: var(--design-surface-card);
+  --drag-background-color: var(--design-surface-strong);
+  --new-card-list-background-color: rgba(230, 229, 224, 0.36);
+  --new-card-list-background-color-menu: rgba(255, 255, 255, 0.94);
+  --float-box-bg-color: rgba(255, 255, 255, 0.78);
+  --gray-border-color: var(--design-hairline);
+  --bottom-nav-background-color: rgba(255, 255, 255, 0.96);
+  --bottom-nav-background-color-hover: rgba(245, 78, 0, 0.1);
 
-  --login-panel-bg: rgb(255, 255, 255, 1);
+  --login-panel-bg: rgba(255, 255, 255, 0.98);
 
-  --app-header-bg: rgba(12, 12, 12, 0.8);
-  --app-header-bg-extend: rgba(12, 12, 12, 0.8);
-  --app-header-text-color: var(--color-gray-5);
+  --app-header-bg: rgba(247, 247, 244, 0.92);
+  --app-header-bg-extend: rgba(247, 247, 244, 0.98);
+  --app-header-text-color: var(--design-ink);
 
-  --text-color: var(--color-gray-10);
+  --text-color: var(--design-ink);
 
-  --card-border-color: rgba(0, 0, 0, 0);
-  --card-shadow-color: rgba(0, 0, 0, 0.16);
-  --card-shadow-extend-color: rgba(0, 0, 0, 0.16);
+  --card-border-color: var(--design-hairline);
+  --card-shadow-color: rgba(38, 37, 30, 0);
+  --card-shadow-extend-color: rgba(38, 37, 30, 0);
 
-  --card-bottom-background-color: rgba(12, 12, 12, 0.6);
+  --card-bottom-background-color: rgba(38, 37, 30, 0.72);
 
-  --inner-card-hover-bg: linear-gradient(135deg, #e8e8e8 0%, #d4d4d4 100%);
+  --inner-card-hover-bg: var(--design-canvas-soft);
 }
 
 .app-light-base-color {
@@ -165,9 +165,9 @@
   --color-gray-12: #141414;
   --color-gray-13: #000000;
 
-  --color-primary: var(--color-blue-5);
-  --color-danger: var(--color-red-5);
-  --color-warning: var(--color-orange-6);
-  --color-success: var(--color-green-5);
+  --color-primary: var(--design-primary);
+  --color-danger: var(--design-error);
+  --color-warning: var(--design-warning);
+  --color-success: var(--design-success);
   --color-info: var(--color-gray-7);
 }

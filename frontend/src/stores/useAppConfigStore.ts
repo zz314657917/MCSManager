@@ -15,6 +15,29 @@ export const useAppConfigStore = createGlobalState(() => {
   const theme: ThemeConfig = reactive({
     algorithm: antTheme.defaultAlgorithm,
     token: {
+      colorBgBase: "#f7f7f4",
+      colorBgContainer: "#ffffff",
+      colorBgElevated: "#ffffff",
+      colorBorder: "#e6e5e0",
+      colorBorderSecondary: "#efeee8",
+      colorError: "#cf2d56",
+      colorInfo: "#807d72",
+      colorPrimary: "#f54e00",
+      colorSuccess: "#1f8a65",
+      colorText: "#26251e",
+      colorTextSecondary: "#5a5852",
+      colorTextTertiary: "#807d72",
+      colorWarning: "#c08532",
+      borderRadius: 8,
+      borderRadiusLG: 12,
+      boxShadow: "none",
+      boxShadowSecondary: "none",
+      controlHeight: 40,
+      fontFamily:
+        'Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+      fontFamilyCode:
+        '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, monospace',
+      fontSize: 14,
       fontSizeLG: 14,
       fontSizeSM: 12,
       fontSizeXL: 18
@@ -68,12 +91,32 @@ export const useAppConfigStore = createGlobalState(() => {
 
   const setLight = () => {
     theme.algorithm = antTheme.defaultAlgorithm;
+    Object.assign(theme.token || {}, {
+      colorBgBase: "#f7f7f4",
+      colorBgContainer: "#ffffff",
+      colorBgElevated: "#ffffff",
+      colorBorder: "#e6e5e0",
+      colorBorderSecondary: "#efeee8",
+      colorText: "#26251e",
+      colorTextSecondary: "#5a5852",
+      colorTextTertiary: "#807d72"
+    });
     document.body.classList.add("app-light-theme");
     document.body.classList.remove("app-dark-theme");
   };
 
   const setDark = () => {
     theme.algorithm = antTheme.darkAlgorithm;
+    Object.assign(theme.token || {}, {
+      colorBgBase: "#171610",
+      colorBgContainer: "#24231d",
+      colorBgElevated: "#24231d",
+      colorBorder: "rgba(230, 229, 224, 0.16)",
+      colorBorderSecondary: "rgba(230, 229, 224, 0.1)",
+      colorText: "#f7f7f4",
+      colorTextSecondary: "#d7d4ca",
+      colorTextTertiary: "#a09c92"
+    });
     document.body.classList.add("app-dark-theme");
     document.body.classList.remove("app-light-theme");
   };

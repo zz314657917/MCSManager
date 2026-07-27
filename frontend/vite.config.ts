@@ -82,10 +82,20 @@ export default defineConfig({
     visualizer({ emitFile: true, filename: "stats.html" })
   ],
   resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@languages": fileURLToPath(new URL("../languages", import.meta.url))
-    }
+    alias: [
+      {
+        find: /^@ant-design\/colors$/,
+        replacement: fileURLToPath(new URL("./src/vendor/antDesignColorsCompat.js", import.meta.url))
+      },
+      {
+        find: "@",
+        replacement: fileURLToPath(new URL("./src", import.meta.url))
+      },
+      {
+        find: "@languages",
+        replacement: fileURLToPath(new URL("../languages", import.meta.url))
+      }
+    ]
   },
   base: "./"
 });
