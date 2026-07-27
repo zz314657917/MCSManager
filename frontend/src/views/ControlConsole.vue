@@ -44,7 +44,7 @@ import JavaManager from "@/widgets/instance/dialogs/JavaManager.vue";
 import McPingSettings from "@/widgets/instance/dialogs/McPingSettings.vue";
 import RconSettings from "@/widgets/instance/dialogs/RconSettings.vue";
 import TermConfig from "@/widgets/instance/dialogs/TermConfig.vue";
-import { Modal } from "ant-design-vue";
+import { Modal, Segmented as ASegmented } from "ant-design-vue";
 import {
   AppstoreAddOutlined,
   AppstoreOutlined,
