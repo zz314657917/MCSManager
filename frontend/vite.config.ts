@@ -15,9 +15,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(path) {
-          if (path.includes("node_modules/ant-design-vue/es")) {
-            return "ant-es";
-          }
           if (path.includes("node_modules/ant-design-vue")) {
             return "ant";
           }
