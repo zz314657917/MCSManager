@@ -444,6 +444,14 @@ routerApp.on("instance/asynchronous", (ctx, data) => {
 });
 
 // Terminate the execution of complex asynchronous tasks
+function assertTaskOwnership(task: any, instanceUuid: string) {
+  const detail = task?.toObject?.();
+  const taskInstanceUuid = String(detail?.instanceUuid || "");
+  if (!instanceUuid || !taskInstanceUuid || taskInstanceUuid !== String(instanceUuid)) {
+    throw new Error("Access denied: asynchronous task does not belong to this instance.");
+  }
+}
+
 routerApp.on("instance/stop_asynchronous", (ctx, data) => {
   const instanceUuid = data.instanceUuid;
   const { taskId } = data.parameter;
@@ -453,6 +461,7 @@ routerApp.on("instance/stop_asynchronous", (ctx, data) => {
   if (taskId && typeof taskId === "string") {
     const task = TaskCenter.getTask(taskId);
     if (!task) throw new Error(`Async Task ID: ${taskId} does not exist`);
+    assertTaskOwnership(task, instanceUuid);
     task.stop();
     return protocol.response(ctx, true);
   }
@@ -477,6 +486,7 @@ routerApp.on("instance/stop_asynchronous", (ctx, data) => {
 
 // Query async task status
 routerApp.on("instance/query_asynchronous", (ctx, data) => {
+  const instanceUuid = String(data.instanceUuid || data.parameter?.instanceUuid || "");
   const taskId = data.parameter.taskId as string | undefined;
   const taskName = data.taskName as string;
   const taskNameTypeMap: IJson<string> = {
@@ -486,21 +496,25 @@ routerApp.on("instance/query_asynchronous", (ctx, data) => {
   if (!taskId) {
     const result = [];
     for (const task of TaskCenter.getTasks(type)) {
+      const detail = task.toObject();
+      if (instanceUuid && String(detail?.instanceUuid || "") !== instanceUuid) continue;
       result.push({
         taskId: task.taskId,
         status: task.status(),
-        detail: task.toObject()
+        detail
       });
     }
     protocol.response(ctx, result);
   } else {
     const task = TaskCenter.getTask(String(taskId));
-    if (task)
+    if (task) {
+      assertTaskOwnership(task, instanceUuid);
       protocol.response(ctx, {
         taskId: task.taskId,
         status: task.status(),
         detail: task.toObject()
       });
+    }
   }
 });
 

@@ -17,6 +17,7 @@ import EventEmitter from "eventemitter3";
 import type { Socket } from "socket.io-client";
 import { computed, onMounted, onUnmounted, ref, unref } from "vue";
 import { makeSocketIo } from "./useSocketIo";
+import { createTerminalHistoryReplayGate } from "./terminalHistoryReplayGate";
 
 export const TERM_COLOR = {
   TERM_RESET: "\x1B[0m",
@@ -70,6 +71,7 @@ export function useTerminal() {
   const socketAddress = ref("");
   let isManualDisconnect = false;
   let activeConfig: UseTerminalParams | undefined;
+  const historyReplayGate = createTerminalHistoryReplayGate();
 
   const isGlobalTerminal = computed(() => {
     return state.value?.config.nickname === GLOBAL_INSTANCE_NAME;
@@ -317,6 +319,13 @@ export function useTerminal() {
     }
 
     term.onData((data) => {
+      // Ignore input events fired while replaying historical backlog —
+      // these are xterm.js's own synthesized escape-sequence replies
+      // (e.g. cursor position reports), not real keystrokes.
+      if (historyReplayGate.isReplaying()) {
+        return;
+      }
+
       // If the PTY terminal is disabled, no input is sent.
       if (
         state.value?.config.terminalOption?.pty === false ||
@@ -368,6 +377,27 @@ export function useTerminal() {
     socketAddress.value = "";
     activeConfig = undefined;
   };
+
+  function writeHistoryLog(text: string): Promise<void> {
+    return new Promise((resolve) => {
+      const term = terminal.value;
+      if (!term) {
+        resolve();
+        return;
+      }
+      historyReplayGate.begin();
+      try {
+        term.write(text, () => {
+          historyReplayGate.end();
+          resolve();
+        });
+      } catch (error) {
+        historyReplayGate.end();
+        console.warn("Failed to replay terminal history:", error);
+        resolve();
+      }
+    });
+  }
 
   const clearTerminal = () => {
     terminal.value?.clear();
@@ -424,7 +454,8 @@ export function useTerminal() {
     disposeTerminalWindow,
     resetTerminalSession,
     sendCommand,
-    clearTerminal
+    clearTerminal,
+    writeHistoryLog
   };
 }
 

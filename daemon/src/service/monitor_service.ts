@@ -307,7 +307,7 @@ export class MonitorService {
     if (!instance) throw new Error("serverId does not match any managed instance");
 
     const expectedToken = this.buildExpectedToken(serverId);
-    if (instanceToken !== expectedToken && instanceToken !== globalConfiguration.config.key) {
+    if (instanceToken !== expectedToken) {
       throw new Error("instanceToken is invalid");
     }
 

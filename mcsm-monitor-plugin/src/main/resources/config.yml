@@ -22,6 +22,8 @@ economy:
   defaultCurrency: "money"
   defaultCurrencyName: "落叶币"
   snapshotIntervalTicks: 1200
+  eventQueueCapacity: 256
+  eventMaxRetries: 3
 
 snapshot:
   includePing: true

@@ -8,3 +8,4 @@
 260627 10:41 | ux-sprint-01-control-target-danger | contract-approved | Codex | docs/workflow/tasks/sprint-01-control-target-danger-contract.md
 260627 10:48 | ux-sprint-01-control-target-danger | build-ready | Codex | frontend/src/views/ControlConsole.vue; frontend/src/components/control/ControlActionButtons.vue
 260627 10:51 | ux-sprint-01-control-target-danger | qa-pass | Codex | docs/workflow/worker-results/ux-sprint-01-control-target-danger-result.md
+260727 19:40 | upstream-v10.17.0-hardening | integration-qa-pass | Codex | docs/workflow/tasks/upstream-v10.17.0-hardening-qa.md

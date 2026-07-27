@@ -11,6 +11,7 @@ import { $t } from "../i18n";
 import { ROLE } from "../entity/user";
 import { getInstancesByUuid } from "../service/instance_service";
 import { toBoolean } from "mcsmanager-common";
+import { systemConfig } from "../setting";
 
 const router = new Router({ prefix: "/auth" });
 
@@ -72,6 +73,9 @@ router.put("/api", permission({ level: ROLE.USER }), async (ctx: Koa.Parameteriz
   try {
     if (user) {
       if (enable) {
+        if (systemConfig?.enableApiKey === false) {
+          throw new Error("API key use is disabled by the administrator.");
+        }
         newKey = v4().replace(/-/gim, "");
         await userSystem.edit(userUuid, {
           apiKey: newKey

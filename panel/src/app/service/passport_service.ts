@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { ROLE, User } from "../entity/user";
 import { $t } from "../i18n";
 import { systemConfig } from "../setting";
+import { checkSafeName } from "../utils/safe";
 import { logger } from "./log";
 import { timeUuid } from "./password";
 import userSystem from "./user_service";
@@ -221,15 +222,10 @@ export function checkBanIp(ctx: Koa.ParameterizedContext) {
 }
 
 export function getUuidByApiKey(apiKey: string) {
-  const pageData = userSystem.getQueryWrapper().selectPage(
-    {
-      apiKey
-    },
-    1,
-    1
-  );
-  if (pageData.total === 1) {
-    return pageData.data[0];
+  if (systemConfig?.enableApiKey === false || !checkSafeName(apiKey)) return null;
+
+  for (const user of userSystem.objects.values()) {
+    if (user.apiKey === apiKey) return user;
   }
   return null;
 }

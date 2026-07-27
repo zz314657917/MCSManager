@@ -584,7 +584,9 @@ export function useGmConsolePreviewState() {
   const selectedServerKey = ref(
     servers.value.length ? createGmServerKey(servers.value[0].daemonId, servers.value[0].instanceId) : ""
   );
-  const selectedPlayerUuid = ref(previewRecords[0]?.players[0]?.presence.playerUuid || "");
+  // Keep the details panel empty until the operator explicitly chooses a player.
+  // Otherwise clicking the first visible player would be interpreted as a toggle-off.
+  const selectedPlayerUuid = ref("");
 
   const currentServer = computed(() =>
     servers.value.find((item) => createGmServerKey(item.daemonId, item.instanceId) === selectedServerKey.value)
