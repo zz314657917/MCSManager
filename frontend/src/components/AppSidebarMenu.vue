@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  isMenuRouteActive,
   useHeaderMenus,
   type SidebarAppDropdownEntry,
   type SidebarEntry
@@ -10,6 +11,7 @@ import {
   AppstoreOutlined,
   AreaChartOutlined,
   DesktopOutlined,
+  DollarCircleOutlined,
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
@@ -28,11 +30,12 @@ const route = useRoute();
 const { sidebarItems, handleToPage } = useHeaderMenus();
 const { logoImage } = useAppConfigStore();
 
-/** Whether route menu item is active (current path equals or is child of this path) */
 const isRouteActive = (path: string): boolean => {
-  if (route.path === path) return true;
-  if (path === "/") return false;
-  return route.path.startsWith(path + "/");
+  return isMenuRouteActive(
+    route.path,
+    path,
+    sidebarItems.value.flatMap((item) => (item.type === "route" ? [item.path] : []))
+  );
 };
 
 /** Sidebar icon for each route path */
@@ -40,6 +43,7 @@ const routePathIcons: Record<string, Component> = {
   "/control": DesktopOutlined,
   "/gm": TeamOutlined,
   "/gm/chat": MessageOutlined,
+  "/economy": DollarCircleOutlined,
   "/players": UserOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
@@ -133,7 +137,7 @@ const onAppDropdownClick = (item: SidebarAppDropdownEntry, info: { key: Key }) =
 
 .left-sidebar:hover {
   width: 246px;
-  background-position-x: -20px;
+  background: var(--design-canvas-soft);
 }
 
 .left-sidebar {
@@ -141,11 +145,12 @@ const onAppDropdownClick = (item: SidebarAppDropdownEntry, info: { key: Key }) =
   flex-direction: column;
   flex: 0 0 240px;
   text-align: left;
-  border-right: 1px solid var(--color-gray-5);
-  background-image: url("@/assets/side.png");
+  border-right: 1px solid var(--design-hairline);
+  background: var(--design-canvas-soft);
   padding: 20px 12px;
-  transition: all 0.3s ease;
-  background-position-x: -80px;
+  transition:
+    width 0.3s ease,
+    background-color 0.18s ease;
 }
 
 .sidebar-menu {
@@ -153,7 +158,7 @@ const onAppDropdownClick = (item: SidebarAppDropdownEntry, info: { key: Key }) =
   flex-direction: column;
   align-items: flex-start;
   padding: 8px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--design-body);
   flex: 1;
   gap: 8px;
   width: 100%;
@@ -168,16 +173,24 @@ const onAppDropdownClick = (item: SidebarAppDropdownEntry, info: { key: Key }) =
   color: inherit;
   text-decoration: none;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.4s ease;
+  border: 1px solid transparent;
+  border-radius: var(--design-radius-md);
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
   width: 100%;
 
   &:hover {
-    background-color: rgba(255, 255, 255, 0.178);
+    border-color: var(--design-hairline);
+    background-color: var(--design-surface-card);
+    color: var(--design-ink);
   }
 
   &.sidebar-item-active {
-    background-color: rgba(255, 255, 255, 0.22);
+    border-color: rgba(245, 78, 0, 0.24);
+    background-color: rgba(245, 78, 0, 0.1);
+    color: var(--design-primary);
   }
 
   .sidebar-item-icon {
@@ -195,7 +208,7 @@ const onAppDropdownClick = (item: SidebarAppDropdownEntry, info: { key: Key }) =
 
 .sidebar-divider {
   height: 1px;
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: var(--design-hairline);
   margin: 12px 0;
   flex-shrink: 0;
   width: 100%;

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { useHeaderMenus } from "@/hooks/useHeaderMenus";
+import { isMenuRouteActive, useHeaderMenus } from "@/hooks/useHeaderMenus";
 import {
   ApartmentOutlined,
   AppstoreOutlined,
   AreaChartOutlined,
   CloseOutlined,
   DesktopOutlined,
+  DollarCircleOutlined,
   LinkOutlined,
   LoginOutlined,
   MenuOutlined,
@@ -28,6 +29,7 @@ const routePathIcons: Record<string, Component> = {
   "/control": DesktopOutlined,
   "/gm": TeamOutlined,
   "/gm/chat": MessageOutlined,
+  "/economy": DollarCircleOutlined,
   "/players": UserOutlined,
   "/instances": AppstoreOutlined,
   "/market": ShopOutlined,
@@ -44,9 +46,11 @@ const routePathIcons: Record<string, Component> = {
 const getRouteIcon = (path: string): Component => routePathIcons[path] ?? MenuOutlined;
 
 const isActive = (path: string): boolean => {
-  if (route.path === path) return true;
-  if (path === "/") return false;
-  return route.path.startsWith(path + "/");
+  return isMenuRouteActive(
+    route.path,
+    path,
+    menus.value.map((item) => item.path)
+  );
 };
 
 const toggleMenu = () => {
@@ -100,7 +104,7 @@ const handleMenuItemClick = (path: string) => {
   position: fixed;
   inset: 0;
   z-index: 1001;
-  background: rgba(0, 0, 0, 0.28);
+  background: rgba(38, 37, 30, 0.24);
   backdrop-filter: blur(2px);
 }
 
@@ -130,12 +134,11 @@ const handleMenuItemClick = (path: string) => {
   gap: 6px;
   padding: 10px;
   max-width: 196px;
-  border-radius: 18px;
+  border: 1px solid var(--design-hairline);
+  border-radius: var(--design-radius-lg);
   background: var(--bottom-nav-background-color);
   backdrop-filter: blur(12px);
-  box-shadow:
-    0 8px 32px var(--card-shadow-extend-color),
-    0 2px 8px var(--card-shadow-color);
+  box-shadow: none;
   transform-origin: bottom right;
 }
 
@@ -157,12 +160,12 @@ const handleMenuItemClick = (path: string) => {
   justify-content: center;
   width: 52px;
   height: 52px;
-  border-radius: 16px;
+  border-radius: var(--design-radius-md);
   transition: all 0.2s ease;
 
   .fab-menu-icon {
     font-size: 20px;
-    color: var(--color-gray-7);
+    color: var(--design-muted);
     transition: all 0.2s ease;
   }
 }
@@ -172,7 +175,7 @@ const handleMenuItemClick = (path: string) => {
 
   .fab-menu-icon {
     font-size: 22px;
-    color: var(--color-gray-13);
+    color: var(--design-primary);
   }
 }
 
@@ -190,8 +193,8 @@ const handleMenuItemClick = (path: string) => {
 .fab-ball {
   width: 56px;
   height: 70px;
-  border-radius: 8px;
-  border: none;
+  border-radius: var(--design-radius-md);
+  border: 1px solid var(--design-hairline);
   cursor: pointer;
   outline: none;
   display: flex;
@@ -199,9 +202,7 @@ const handleMenuItemClick = (path: string) => {
   justify-content: center;
   background: var(--bottom-nav-background-color);
   backdrop-filter: blur(12px);
-  box-shadow:
-    0 8px 24px var(--card-shadow-extend-color),
-    0 2px 8px var(--card-shadow-color);
+  box-shadow: none;
   transition:
     transform 0.22s ease,
     box-shadow 0.22s ease;
@@ -210,9 +211,8 @@ const handleMenuItemClick = (path: string) => {
 
 .fab-ball:hover {
   transform: scale(1.08);
-  box-shadow:
-    0 12px 32px var(--card-shadow-extend-color),
-    0 4px 12px var(--card-shadow-color);
+  border-color: var(--design-hairline-strong);
+  box-shadow: none;
 }
 
 .fab-ball:active {
@@ -220,14 +220,13 @@ const handleMenuItemClick = (path: string) => {
 }
 
 .fab-ball--expanded {
-  box-shadow:
-    0 12px 32px var(--card-shadow-extend-color),
-    0 4px 12px var(--card-shadow-color);
+  border-color: rgba(245, 78, 0, 0.38);
+  box-shadow: none;
 }
 
 .fab-ball-icon {
   font-size: 20px;
-  color: var(--color-gray-10);
+  color: var(--design-ink);
 }
 
 // ---- Transitions ----

@@ -2,6 +2,7 @@
 import type { OperationsMobileNavItem } from "@/components/operations/mobileNav";
 import {
   ControlOutlined,
+  DollarCircleOutlined,
   MessageOutlined,
   TeamOutlined
 } from "@ant-design/icons-vue";
@@ -20,7 +21,8 @@ const currentPath = computed(() => route.path);
 const iconMap = {
   control: ControlOutlined,
   players: TeamOutlined,
-  chat: MessageOutlined
+  chat: MessageOutlined,
+  economy: DollarCircleOutlined
 } as const;
 
 const isActive = (item: OperationsMobileNavItem) => currentPath.value === item.path;
@@ -58,13 +60,13 @@ const navigateTo = (item: OperationsMobileNavItem) => {
   bottom: 0;
   z-index: 7;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  border-top: 1px solid var(--design-hairline);
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
-  box-shadow: 0 -16px 36px rgba(15, 23, 42, 0.12);
+  box-shadow: none;
 }
 
 .operations-mobile-nav__item {
@@ -75,9 +77,9 @@ const navigateTo = (item: OperationsMobileNavItem) => {
   gap: 4px;
   min-height: 54px;
   border: 1px solid transparent;
-  border-radius: 16px;
-  background: rgba(248, 250, 252, 0.88);
-  color: var(--color-gray-7);
+  border-radius: var(--design-radius-md);
+  background: var(--design-canvas-soft);
+  color: var(--design-muted);
   font-size: 12px;
   font-weight: 700;
   transition:
@@ -88,12 +90,10 @@ const navigateTo = (item: OperationsMobileNavItem) => {
 }
 
 .operations-mobile-nav__item.is-active {
-  border-color: rgba(37, 99, 235, 0.28);
-  background: rgba(219, 234, 254, 0.94);
-  color: var(--color-blue-8);
-  box-shadow:
-    0 10px 24px rgba(37, 99, 235, 0.12),
-    inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+  border-color: rgba(245, 78, 0, 0.3);
+  background: rgba(245, 78, 0, 0.1);
+  color: var(--design-primary);
+  box-shadow: none;
 }
 
 .operations-mobile-nav__icon {

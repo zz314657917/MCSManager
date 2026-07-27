@@ -13,6 +13,15 @@ endpoints:
   heartbeatPath: "/v1/plugin/heartbeat"
   playerSnapshotPath: "/v1/plugin/player_snapshot"
   chatMessagePath: "/v1/plugin/chat_message"
+  economyEventPath: "/v1/plugin/economy_event"
+  economySnapshotPath: "/v1/plugin/economy_snapshot"
+
+economy:
+  enabled: true
+  provider: "PlayerCurrency"
+  defaultCurrency: "money"
+  defaultCurrencyName: "落叶币"
+  snapshotIntervalTicks: 1200
 
 snapshot:
   includePing: true

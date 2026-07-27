@@ -9,6 +9,7 @@ softdepend:
   - Vault
   - PlayerPoints
   - LuckPerms
+  - PlayerCurrency
 commands:
   mcsmmonitor:
     description: Manage the MCSM monitor plugin.

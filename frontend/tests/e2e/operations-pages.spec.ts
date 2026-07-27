@@ -3,7 +3,8 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 const isMobileProject = (testInfo: TestInfo) => testInfo.project.name.includes("mobile");
 
 const gotoPreviewRoute = async (page: Page, hashRoute: string, readyTestId: string) => {
-  await page.goto(`/#${hashRoute}`);
+  const joiner = hashRoute.includes("?") ? "&" : "?";
+  await page.goto(`/#${hashRoute}${joiner}preview=1`);
   await expect(page.getByTestId(readyTestId)).toBeVisible({ timeout: 30_000 });
 };
 

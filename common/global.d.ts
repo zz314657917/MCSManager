@@ -339,6 +339,100 @@ declare global {
     >;
   }
 
+  type IMcsmEconomyCategory =
+    | "SYSTEM_IN"
+    | "SYSTEM_OUT"
+    | "PLAYER_TRANSFER"
+    | "TAX"
+    | "ADMIN_ADJUST"
+    | "ROLLBACK"
+    | "UNKNOWN";
+
+  interface IMcsmEconomyCurrency {
+    type: string;
+    name: string;
+    totalBalance: number;
+    playerCount: number;
+    updatedAt?: string;
+  }
+
+  interface IMcsmEconomyTransaction {
+    id: string;
+    daemonId: string;
+    instanceId: string;
+    serverId: string;
+    playerUuid: string;
+    playerName?: string;
+    currencyType: string;
+    currencyName?: string;
+    delta: number;
+    balanceAfter: number;
+    operatorName?: string;
+    operatorReason?: string;
+    category: IMcsmEconomyCategory;
+    source?: string;
+    referenceId?: string;
+    occurredAt: string;
+    receivedAt: string;
+  }
+
+  interface IMcsmEconomyOverviewServer {
+    daemonId: string;
+    daemonDisplayName: string;
+    daemonAvailable: boolean;
+    instanceId: string;
+    instanceDisplayName: string;
+    currencyType: string;
+    currencyName: string;
+    todayIn: number;
+    todayOut: number;
+    netChange: number;
+    transactionCount: number;
+    lastEventAt?: string;
+    dataDelayMs?: number;
+    pluginAvailable: boolean;
+    pluginStatusText: string;
+    currencies: IMcsmEconomyCurrency[];
+    hourly: Array<{
+      hour: number;
+      label: string;
+      systemIn: number;
+      systemOut: number;
+      netChange: number;
+      transactionCount: number;
+    }>;
+    sources: Array<{
+      category: IMcsmEconomyCategory;
+      source: string;
+      amount: number;
+      transactionCount: number;
+    }>;
+  }
+
+  interface IMcsmEconomyOverviewResponse {
+    generatedAt: number;
+    summary: {
+      serversTotal: number;
+      serversAvailable: number;
+      todayIn: number;
+      todayOut: number;
+      netChange: number;
+      transactionCount: number;
+    };
+    servers: IMcsmEconomyOverviewServer[];
+  }
+
+  interface IMcsmEconomyTransactionsResponse {
+    generatedAt: number;
+    items: IMcsmEconomyTransaction[];
+    total: number;
+  }
+
+  interface IMcsmEconomyCurrenciesResponse {
+    generatedAt: number;
+    items: IMcsmEconomyCurrency[];
+  }
+
   type IMcsmGmChatPluginType = "playerchat" | "native";
 
   type IMcsmGmActionKind =
