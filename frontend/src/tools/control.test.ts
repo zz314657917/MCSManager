@@ -30,7 +30,8 @@ describe("control output normalization", () => {
   });
 
   it("treats carriage-return rewrites as in-place updates instead of extra log lines", () => {
-    const rawOutput = "> \r\u001b[K[15:58:30] [Server thread/INFO]: \u001b[0;37;22m========================\u001b[39;0m\n> ";
+    const rawOutput =
+      "> \r\u001b[K[15:58:30] [Server thread/INFO]: \u001b[0;37;22m========================\u001b[39;0m\n> ";
 
     expect(splitControlOutputLog(rawOutput)).toEqual([
       "[15:58:30] [Server thread/INFO]: ========================"
@@ -68,6 +69,37 @@ describe("control output normalization", () => {
     expect(normalizeControlOutputLog(rawOutput)).toBe(
       "[16:10:29] [Server thread/INFO]: For next page perform cmi ? 2"
     );
+  });
+
+  it("renders cursor-addressed alternate-screen output while a full-screen process is active", () => {
+    const rawOutput = [
+      "shell ready\n",
+      "\u001b[?1049h\u001b[2J\u001b[H",
+      "top - 16:12:00\u001b[2;1HTasks: 42 total, 1 running\u001b[3;1H%Cpu(s): 3.2 us"
+    ].join("");
+
+    expect(normalizeControlOutputLog(rawOutput)).toBe(
+      ["top - 16:12:00", "Tasks: 42 total, 1 running", "%Cpu(s): 3.2 us"].join("\n")
+    );
+  });
+
+  it("restores the shell screen after an alternate-screen process exits", () => {
+    const rawOutput = "shell ready\n\u001b[?1049h\u001b[2J\u001b[Htop\u001b[?1049l";
+
+    expect(normalizeControlOutputLog(rawOutput)).toBe("shell ready");
+  });
+
+  it("updates a full-screen line in place when the process uses carriage return", () => {
+    const rawOutput = "\u001b[2J\u001b[Hload: 1.0\u001b[1;1Hload: 2.0";
+
+    expect(normalizeControlOutputLog(rawOutput)).toBe("load: 2.0");
+  });
+
+  it("bounds oversized cursor coordinates from untrusted terminal output", () => {
+    const normalized = normalizeControlOutputLog("\u001b[999999;999999Hsafe");
+
+    expect(normalized.trimStart()).toBe("safe");
+    expect(normalized.length).toBeLessThanOrEqual(2004);
   });
 });
 
@@ -142,11 +174,15 @@ describe("control request retry handling", () => {
 
   it("preserves the original backend message when it is already specific", () => {
     expect(
-      resolveControlRequestErrorText(new Error("令牌(Token)验证失败，拒绝访问"), "加载节点列表失败", {
-        forbiddenText: "权限不足，无法执行当前控制操作",
-        serverErrorText: "Panel 服务异常，请稍后重试",
-        networkErrorText: "网络异常，无法连接 Panel"
-      })
+      resolveControlRequestErrorText(
+        new Error("令牌(Token)验证失败，拒绝访问"),
+        "加载节点列表失败",
+        {
+          forbiddenText: "权限不足，无法执行当前控制操作",
+          serverErrorText: "Panel 服务异常，请稍后重试",
+          networkErrorText: "网络异常，无法连接 Panel"
+        }
+      )
     ).toBe("令牌(Token)验证失败，拒绝访问");
   });
 });

@@ -2,7 +2,7 @@
 title: Frontend Control Console
 type: module-note
 module: frontend
-last_verified: 2026-05-21
+last_verified: 2026-07-26
 ---
 
 # 相关文件
@@ -30,6 +30,8 @@ last_verified: 2026-05-21
 - `/control` 页内终端不是 `TerminalCore` 的实时 xterm；它通过 `/api/protected_instance/outputlog` 拉取 daemon 侧 `data/InstanceLog/<uuid>.log` 快照。
 - 普通实例终端页走 `stream_channel + socket.io` 实时订阅 `instance/stdout`，两者刷新语义不同；排查 control 页日志延迟时要先看 daemon 日志缓冲落盘和前端轮询。
 - daemon 侧 `instance_event_router.ts` 先收到实时输出，再每 500ms 追加到日志文件；命令发送后前端需要覆盖这个落盘延迟做强制快照刷新。
+- `normalizeControlOutputLog` 负责把 ANSI 光标定位、清屏和 alternate screen 转成当前可读快照，供 `top`、`htop` 等全屏程序展示；光标参数必须限制上限，避免异常输出拖垮浏览器。
+- `/control` 仍只发送整行命令，不等同于完整交互式 xterm；页面提供 `q` 和 `Ctrl+C` 恢复入口，复杂交互继续使用“高级终端”。
 
 # 验证
 - 这类改动至少运行 `frontend` 的 `vitest` 针对性用例和 `npm.cmd run type-check`。

@@ -126,6 +126,17 @@ const ensureTerminalLine = (lines: string[][], row: number) => {
   return lines[row];
 };
 
+const CONTROL_TERMINAL_MAX_ROWS = 1000;
+const CONTROL_TERMINAL_MAX_COLUMNS = 2000;
+
+const clampTerminalRow = (row: number) => Math.min(CONTROL_TERMINAL_MAX_ROWS - 1, Math.max(0, row));
+
+const clampTerminalColumn = (column: number) =>
+  Math.min(CONTROL_TERMINAL_MAX_COLUMNS - 1, Math.max(0, column));
+
+const clampTerminalCount = (count: number, max = CONTROL_TERMINAL_MAX_ROWS) =>
+  Math.min(max, Math.max(1, count));
+
 const padTerminalLineToCursor = (line: string[], cursorColumn: number) => {
   while (line.length < cursorColumn) {
     line.push(" ");
@@ -133,7 +144,7 @@ const padTerminalLineToCursor = (line: string[], cursorColumn: number) => {
 };
 
 const parseTerminalControlParameter = (value: string, fallback: number) => {
-  const parsed = Number.parseInt(value, 10);
+  const parsed = Number.parseInt(value.replace(/^[?>]/, ""), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -141,7 +152,8 @@ const eraseTerminalLine = (line: string[], cursorColumn: number, parameter: stri
   const mode = parseTerminalControlParameter(parameter, 0);
 
   if (mode === 1) {
-    for (let index = 0; index < Math.min(cursorColumn, line.length); index += 1) {
+    const eraseEnd = Math.min(cursorColumn + 1, line.length);
+    for (let index = 0; index < eraseEnd; index += 1) {
       line[index] = " ";
     }
     return;
@@ -156,6 +168,64 @@ const eraseTerminalLine = (line: string[], cursorColumn: number, parameter: stri
 };
 
 const TRANSIENT_TERMINAL_PROMPT_LINE = /^\s*(?:>|\$|#)\s*$/;
+
+interface TerminalScreenState {
+  lines: string[][];
+  row: number;
+  column: number;
+  savedCursor: {
+    row: number;
+    column: number;
+  };
+}
+
+const createTerminalScreen = (): TerminalScreenState => ({
+  lines: [[]],
+  row: 0,
+  column: 0,
+  savedCursor: {
+    row: 0,
+    column: 0
+  }
+});
+
+const eraseTerminalDisplay = (screen: TerminalScreenState, mode: number) => {
+  if (mode === 2 || mode === 3) {
+    const cursor = { row: screen.row, column: screen.column };
+    screen.lines = [[]];
+    screen.row = cursor.row;
+    screen.column = cursor.column;
+    ensureTerminalLine(screen.lines, screen.row);
+    return;
+  }
+
+  if (mode === 1) {
+    for (let row = 0; row <= screen.row; row += 1) {
+      const line = ensureTerminalLine(screen.lines, row);
+      const eraseEnd = row === screen.row ? Math.min(screen.column + 1, line.length) : line.length;
+      for (let column = 0; column < eraseEnd; column += 1) {
+        line[column] = " ";
+      }
+    }
+    return;
+  }
+
+  const currentLine = ensureTerminalLine(screen.lines, screen.row);
+  currentLine.length = Math.min(screen.column, currentLine.length);
+  screen.lines.length = screen.row + 1;
+};
+
+const insertTerminalLines = (screen: TerminalScreenState, count: number) => {
+  const safeCount = clampTerminalCount(count);
+  screen.lines.splice(screen.row, 0, ...Array.from({ length: safeCount }, () => []));
+  screen.lines.length = Math.min(screen.lines.length, CONTROL_TERMINAL_MAX_ROWS);
+};
+
+const deleteTerminalLines = (screen: TerminalScreenState, count: number) => {
+  const safeCount = clampTerminalCount(count);
+  screen.lines.splice(screen.row, safeCount);
+  ensureTerminalLine(screen.lines, screen.row);
+};
 
 const sanitizeRenderedTerminalLines = (lines: string[]) => {
   const sanitized: string[] = [];
@@ -180,9 +250,29 @@ const sanitizeRenderedTerminalLines = (lines: string[]) => {
 // Convert raw outputlog snapshots into a readable terminal transcript.
 const renderTerminalSnapshot = (raw?: string | null) => {
   const source = String(raw ?? "").replace(/\r\n/g, "\n");
-  const lines: string[][] = [[]];
-  let row = 0;
-  let column = 0;
+  let mainScreen = createTerminalScreen();
+  let activeScreen = mainScreen;
+  let alternateScreenActive = false;
+
+  const setCursor = (row: number, column: number) => {
+    activeScreen.row = clampTerminalRow(row);
+    activeScreen.column = clampTerminalColumn(column);
+    ensureTerminalLine(activeScreen.lines, activeScreen.row);
+  };
+
+  const switchAlternateScreen = (enabled: boolean) => {
+    if (enabled === alternateScreenActive) return;
+
+    if (enabled) {
+      mainScreen = activeScreen;
+      activeScreen = createTerminalScreen();
+      alternateScreenActive = true;
+      return;
+    }
+
+    activeScreen = mainScreen;
+    alternateScreenActive = false;
+  };
 
   for (let index = 0; index < source.length; index += 1) {
     const char = source[index];
@@ -202,37 +292,135 @@ const renderTerminalSnapshot = (raw?: string | null) => {
 
         const command = source[sequenceEnd];
         const parameterText = source.slice(index + 2, sequenceEnd);
-        const parameters = parameterText.split(";");
-        const currentLine = ensureTerminalLine(lines, row);
+        const privateMode = /^[?>]/.test(parameterText);
+        const parameters = parameterText.replace(/^[?>]/, "").split(";");
+        const firstParameter = parseTerminalControlParameter(parameters[0] || "1", 1);
+        const secondParameter = parseTerminalControlParameter(parameters[1] || "1", 1);
+        const currentLine = ensureTerminalLine(activeScreen.lines, activeScreen.row);
 
         switch (command) {
+          case "A":
+            activeScreen.row = clampTerminalRow(
+              activeScreen.row - clampTerminalCount(firstParameter)
+            );
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
+            break;
+          case "B":
+            activeScreen.row = clampTerminalRow(
+              activeScreen.row + clampTerminalCount(firstParameter)
+            );
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
+            break;
+          case "E":
+            activeScreen.row = clampTerminalRow(
+              activeScreen.row + clampTerminalCount(firstParameter)
+            );
+            activeScreen.column = 0;
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
+            break;
+          case "F":
+            activeScreen.row = clampTerminalRow(
+              activeScreen.row - clampTerminalCount(firstParameter)
+            );
+            activeScreen.column = 0;
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
+            break;
+          case "H":
+          case "f":
+            setCursor(firstParameter - 1, secondParameter - 1);
+            break;
           case "K":
-            eraseTerminalLine(currentLine, column, parameters[0] || "0");
+            eraseTerminalLine(currentLine, activeScreen.column, parameters[0] || "0");
             break;
           case "G":
-            column = Math.max(0, parseTerminalControlParameter(parameters[0], 1) - 1);
+            activeScreen.column = clampTerminalColumn(firstParameter - 1);
             break;
           case "C":
-            column += Math.max(0, parseTerminalControlParameter(parameters[0], 1));
+            activeScreen.column = clampTerminalColumn(
+              activeScreen.column + clampTerminalCount(firstParameter, CONTROL_TERMINAL_MAX_COLUMNS)
+            );
             break;
           case "D":
-            column = Math.max(0, column - Math.max(0, parseTerminalControlParameter(parameters[0], 1)));
+            activeScreen.column = clampTerminalColumn(
+              activeScreen.column - clampTerminalCount(firstParameter, CONTROL_TERMINAL_MAX_COLUMNS)
+            );
+            break;
+          case "d":
+            activeScreen.row = clampTerminalRow(firstParameter - 1);
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
             break;
           case "P": {
-            const deleteCount = Math.max(0, parseTerminalControlParameter(parameters[0], 1));
-            currentLine.splice(column, deleteCount);
+            const deleteCount = clampTerminalCount(firstParameter, CONTROL_TERMINAL_MAX_COLUMNS);
+            currentLine.splice(activeScreen.column, deleteCount);
             break;
           }
-          case "J": {
-            const mode = parseTerminalControlParameter(parameters[0], 0);
-            if (mode === 2 || mode === 3) {
-              lines.length = 1;
-              lines[0] = [];
-              row = 0;
-              column = 0;
+          case "@": {
+            const insertCount = clampTerminalCount(firstParameter, CONTROL_TERMINAL_MAX_COLUMNS);
+            currentLine.splice(
+              activeScreen.column,
+              0,
+              ...Array.from({ length: insertCount }, () => " ")
+            );
+            currentLine.length = Math.min(currentLine.length, CONTROL_TERMINAL_MAX_COLUMNS);
+            break;
+          }
+          case "X": {
+            const eraseCount = clampTerminalCount(firstParameter, CONTROL_TERMINAL_MAX_COLUMNS);
+            for (
+              let column = activeScreen.column;
+              column < activeScreen.column + eraseCount;
+              column += 1
+            ) {
+              if (column < currentLine.length) currentLine[column] = " ";
             }
             break;
           }
+          case "L":
+            insertTerminalLines(activeScreen, firstParameter);
+            break;
+          case "M":
+            deleteTerminalLines(activeScreen, firstParameter);
+            break;
+          case "S":
+            activeScreen.lines.splice(0, clampTerminalCount(firstParameter));
+            ensureTerminalLine(activeScreen.lines, activeScreen.row);
+            break;
+          case "T":
+            activeScreen.lines.unshift(
+              ...Array.from({ length: clampTerminalCount(firstParameter) }, () => [])
+            );
+            activeScreen.lines.length = Math.min(
+              activeScreen.lines.length,
+              CONTROL_TERMINAL_MAX_ROWS
+            );
+            break;
+          case "J": {
+            eraseTerminalDisplay(
+              activeScreen,
+              parseTerminalControlParameter(parameters[0] || "0", 0)
+            );
+            break;
+          }
+          case "s":
+            activeScreen.savedCursor = {
+              row: activeScreen.row,
+              column: activeScreen.column
+            };
+            break;
+          case "u":
+            setCursor(activeScreen.savedCursor.row, activeScreen.savedCursor.column);
+            break;
+          case "h":
+          case "l":
+            if (privateMode) {
+              const modes = parameters.map((parameter) =>
+                parseTerminalControlParameter(parameter, 0)
+              );
+              if (modes.some((mode) => mode === 47 || mode === 1047 || mode === 1049)) {
+                switchAlternateScreen(command === "h");
+              }
+            }
+            break;
           default:
             break;
         }
@@ -261,31 +449,35 @@ const renderTerminalSnapshot = (raw?: string | null) => {
       continue;
     }
 
+    if (char === "\x07") {
+      continue;
+    }
+
     if (char === "\n") {
-      row += 1;
-      column = 0;
-      ensureTerminalLine(lines, row);
+      activeScreen.row = clampTerminalRow(activeScreen.row + 1);
+      activeScreen.column = 0;
+      ensureTerminalLine(activeScreen.lines, activeScreen.row);
       continue;
     }
 
     if (char === "\r") {
-      column = 0;
+      activeScreen.column = 0;
       continue;
     }
 
     if (char === "\b") {
-      column = Math.max(0, column - 1);
+      activeScreen.column = Math.max(0, activeScreen.column - 1);
       continue;
     }
 
     if (char === "\t") {
-      const currentLine = ensureTerminalLine(lines, row);
-      const remainder = column % 4;
+      const currentLine = ensureTerminalLine(activeScreen.lines, activeScreen.row);
+      const remainder = activeScreen.column % 4;
       const spaces = remainder === 0 ? 4 : 4 - remainder;
-      padTerminalLineToCursor(currentLine, column);
+      padTerminalLineToCursor(currentLine, activeScreen.column);
       for (let spaceIndex = 0; spaceIndex < spaces; spaceIndex += 1) {
-        currentLine[column] = " ";
-        column += 1;
+        currentLine[activeScreen.column] = " ";
+        activeScreen.column = clampTerminalColumn(activeScreen.column + 1);
       }
       continue;
     }
@@ -294,13 +486,21 @@ const renderTerminalSnapshot = (raw?: string | null) => {
       continue;
     }
 
-    const currentLine = ensureTerminalLine(lines, row);
-    padTerminalLineToCursor(currentLine, column);
-    currentLine[column] = char;
-    column += 1;
+    const currentLine = ensureTerminalLine(activeScreen.lines, activeScreen.row);
+    if (
+      activeScreen.column === CONTROL_TERMINAL_MAX_COLUMNS - 1 &&
+      currentLine.length >= CONTROL_TERMINAL_MAX_COLUMNS
+    ) {
+      currentLine.shift();
+      currentLine.push(char);
+      continue;
+    }
+    padTerminalLineToCursor(currentLine, activeScreen.column);
+    currentLine[activeScreen.column] = char;
+    activeScreen.column = clampTerminalColumn(activeScreen.column + 1);
   }
 
-  return sanitizeRenderedTerminalLines(lines.map((line) => line.join(""))).join("\n");
+  return sanitizeRenderedTerminalLines(activeScreen.lines.map((line) => line.join(""))).join("\n");
 };
 
 export const normalizeControlOutputLog = (raw?: string | null) => renderTerminalSnapshot(raw);

@@ -434,6 +434,11 @@ const handleSendCommandWithHistory = async () => {
   await sendCommand();
 };
 
+const sendTerminalControl = async (control: "q" | "^C") => {
+  commandInput.value = control;
+  await handleSendCommandWithHistory();
+};
+
 const openPlayersPage = () => {
   router.push("/gm");
 };
@@ -1287,6 +1292,27 @@ onUnmounted(() => {
                 {{ t("TXT_CODE_CONTROL_TERMINAL_POLL_INTERVAL", { interval: pollIntervalMs }) }}
               </div>
             </div>
+            <div v-if="isPhone" class="control-console__terminal-emergency-actions">
+              <a-tooltip :title="t('TXT_CODE_CONTROL_QUIT_FULLSCREEN')">
+                <a-button
+                  size="small"
+                  :disabled="!currentTarget.daemonAvailable"
+                  @click="sendTerminalControl('q')"
+                >
+                  q
+                </a-button>
+              </a-tooltip>
+              <a-tooltip :title="t('TXT_CODE_CONTROL_INTERRUPT')">
+                <a-button
+                  size="small"
+                  danger
+                  :disabled="!currentTarget.daemonAvailable"
+                  @click="sendTerminalControl('^C')"
+                >
+                  Ctrl+C
+                </a-button>
+              </a-tooltip>
+            </div>
             <div v-if="!isPhone" class="control-console__terminal-actions">
               <a-input
                 v-model:value="logSearchQuery"
@@ -1301,6 +1327,21 @@ onUnmounted(() => {
               </a-input>
               <a-button size="small" @click="togglePolling">
                 {{ isPollingPaused ? t("TXT_CODE_ed3fc23") : t("TXT_CODE_CONTROL_PAUSE") }}
+              </a-button>
+              <a-button
+                size="small"
+                :disabled="!currentTarget.daemonAvailable"
+                @click="sendTerminalControl('q')"
+              >
+                {{ t("TXT_CODE_CONTROL_QUIT_FULLSCREEN") }}
+              </a-button>
+              <a-button
+                size="small"
+                danger
+                :disabled="!currentTarget.daemonAvailable"
+                @click="sendTerminalControl('^C')"
+              >
+                {{ t("TXT_CODE_CONTROL_INTERRUPT") }}
               </a-button>
               <a-button size="small" @click="clearCurrentLogs">{{ t("TXT_CODE_7333c7f7") }}</a-button>
               <a-button size="small" :loading="isRefreshBusy" @click="handleRefresh">
@@ -2359,6 +2400,13 @@ onUnmounted(() => {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.control-console__terminal-emergency-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
 }
 
 .control-console__terminal-search {
