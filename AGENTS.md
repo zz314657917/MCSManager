@@ -12,7 +12,7 @@
 - `common/`：Panel 和 Daemon 共用的 TypeScript 公共层与全局类型。
 - `languages/`：多语言文案资源。
 - `mcsm-monitor-plugin/`：Minecraft/Spigot 监控插件，Java 8，目标 Spigot API 1.12.2。
-- `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 18+，用于安全查询和操作实例。
+- `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 20+，用于安全查询和操作实例。
 
 远端协作约定：
 

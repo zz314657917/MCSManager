@@ -9,7 +9,7 @@ last_verified: 2026-04-15
 - `mcsmanager-mcp-server/`
 
 # 当前定位
-这是独立的 Node.js 18+ TypeScript MCP stdio server，供 AstrBot 等上层通过 MCP 协议访问 MCSManager 能力。
+这是独立的 Node.js 20+ TypeScript MCP stdio server，供 AstrBot 等上层通过 MCP 协议访问 MCSManager 能力。
 
 # 当前约束
 - 只访问 panel API

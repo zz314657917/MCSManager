@@ -24,7 +24,7 @@ last_verified: 2026-06-07
 - `common/`：前后端共享类型
 - `languages/`：多语言文案
 - `mcsm-monitor-plugin/`：Minecraft 监控插件，Java 8，Spigot 1.12.2
-- `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 18+
+- `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 20+
 
 # 当前监控链路
 - Minecraft 插件：`mcsm-monitor-plugin/`
