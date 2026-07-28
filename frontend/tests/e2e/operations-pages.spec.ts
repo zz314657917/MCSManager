@@ -15,6 +15,7 @@ const parseCompactNumber = (value: string) => {
 
 test("control desktop preview supports target switch and command flow", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+  await page.setViewportSize({ width: 2000, height: 900 });
 
   await gotoPreviewRoute(page, "/control", "control-console");
 
@@ -33,6 +34,15 @@ test("control desktop preview supports target switch and command flow", async ({
 
   await page.getByTestId("control-actions-slot").scrollIntoViewIfNeeded();
   await expect(page.getByTestId("control-actions-desktop")).toBeInViewport();
+
+  const actionButtons = ["start", "restart", "stop", "terminate"].map((action) =>
+    page.getByTestId(`control-action-${action}`)
+  );
+  const actionButtonBoxes = await Promise.all(actionButtons.map((button) => button.boundingBox()));
+  expect(actionButtonBoxes.every(Boolean)).toBe(true);
+  const actionButtonTops = actionButtonBoxes.map((box) => box?.y ?? 0);
+  expect(Math.max(...actionButtonTops) - Math.min(...actionButtonTops)).toBeLessThanOrEqual(1);
+
   await page.getByTestId("control-action-stop").click();
   const stopConfirmDialog = page.locator(".ant-modal-confirm");
   await expect(stopConfirmDialog).toContainText(/确认停止当前实例|Stop Instance|Are you sure/);
@@ -41,6 +51,93 @@ test("control desktop preview supports target switch and command flow", async ({
 
   await page.getByTestId("control-action-start").click();
   await expect(terminal).toContainText("[instance] Lobby is now running.");
+});
+
+test("control target statuses stay distinct in light and dark themes", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/control", "control-console");
+
+  const runningStatus = page.getByTestId(
+    "control-target-status-home-daemon-a-instance-paper-lobby"
+  );
+  const startingStatus = page.getByTestId(
+    "control-target-status-home-daemon-a-instance-survival-main"
+  );
+  const stoppedStatus = page.getByTestId(
+    "control-target-status-home-daemon-a-instance-proxy-gate"
+  );
+  const offlineStatus = page.getByTestId(
+    "control-target-status-backup-daemon-c-instance-backup-world"
+  );
+  const runningCard = page.getByTestId(
+    "control-target-card-home-daemon-a-instance-paper-lobby"
+  );
+  const summaryMetaItem = page.locator(".control-console__summary-meta-item").first();
+  const metricCard = page.locator(".control-console__metric-card").first();
+  const parseColor = (color: string) => color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [];
+  const relativeLuminance = (color: string) => {
+    const channels = parseColor(color).map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.03928
+        ? normalized / 12.92
+        : Math.pow((normalized + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const contrastRatio = (foreground: string, background: string) => {
+    const foregroundLuminance = relativeLuminance(foreground);
+    const backgroundLuminance = relativeLuminance(background);
+    return (
+      (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+      (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+    );
+  };
+
+  for (const theme of [
+    { storageValue: "1", bodyClass: "app-light-theme" },
+    { storageValue: "2", bodyClass: "app-dark-theme" }
+  ]) {
+    await page.evaluate(
+      ({ key, value }) => window.localStorage.setItem(key, value),
+      { key: "THEME_KEY", value: theme.storageValue }
+    );
+    await page.reload();
+    await expect(page.getByTestId("control-console")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("body")).toHaveClass(new RegExp(theme.bodyClass));
+
+    await expect(runningStatus).toHaveAttribute("data-status-tone", "success");
+    await expect(startingStatus).toHaveAttribute("data-status-tone", "processing");
+    await expect(stoppedStatus).toHaveAttribute("data-status-tone", "error");
+    await expect(offlineStatus).toHaveAttribute("data-status-tone", "default");
+
+    const [runningColor, stoppedColor, offlineColor] = await Promise.all(
+      [runningStatus, stoppedStatus, offlineStatus].map((status) =>
+        status.evaluate((element) => window.getComputedStyle(element).color)
+      )
+    );
+    const [runningRed, runningGreen] = parseColor(runningColor);
+    const [stoppedRed, stoppedGreen] = parseColor(stoppedColor);
+    const cardColors = await runningCard.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { background: style.backgroundColor, foreground: style.color };
+    });
+    const summaryColors = await summaryMetaItem.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { background: style.backgroundColor, foreground: style.color };
+    });
+    const metricColors = await metricCard.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { background: style.backgroundColor, foreground: style.color };
+    });
+
+    expect(runningGreen).toBeGreaterThan(runningRed);
+    expect(stoppedRed).toBeGreaterThan(stoppedGreen);
+    expect(new Set([runningColor, stoppedColor, offlineColor]).size).toBe(3);
+    expect(contrastRatio(cardColors.foreground, cardColors.background)).toBeGreaterThan(4.5);
+    expect(contrastRatio(summaryColors.foreground, summaryColors.background)).toBeGreaterThan(4.5);
+    expect(contrastRatio(metricColors.foreground, metricColors.background)).toBeGreaterThan(4.5);
+  }
 });
 
 test("control desktop preview brings favorite instances to the front", async ({ page }, testInfo) => {

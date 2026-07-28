@@ -1110,7 +1110,11 @@ onUnmounted(() => {
               </span>
             </div>
             <div class="control-console__mobile-switcher-tags">
-              <a-tag :color="getControlTargetStatusColor(currentTarget)">
+              <a-tag
+                class="control-console__status-tag"
+                :color="getControlTargetStatusColor(currentTarget)"
+                :data-status-tone="getControlTargetStatusColor(currentTarget)"
+              >
                 {{ getControlTargetStatusText(currentTarget) }}
               </a-tag>
               <a-tag :color="dashboardSourceTagColor">
@@ -1165,7 +1169,11 @@ onUnmounted(() => {
             <span>{{ t("TXT_CODE_CONTROL_SUMMARY") }}</span>
             <div class="control-console__summary-header-actions">
               <div class="control-console__summary-tags">
-                <a-tag :color="getControlTargetStatusColor(currentTarget)">
+                <a-tag
+                  class="control-console__status-tag"
+                  :color="getControlTargetStatusColor(currentTarget)"
+                  :data-status-tone="getControlTargetStatusColor(currentTarget)"
+                >
                   {{ getControlTargetStatusText(currentTarget) }}
                 </a-tag>
                 <a-tag :color="dashboardSourceTagColor">
@@ -1877,12 +1885,10 @@ onUnmounted(() => {
 
 .control-panel {
   min-height: 0;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--card-border-color);
   border-radius: 20px;
   background: var(--background-color-white);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .control-panel__header {
@@ -1904,6 +1910,31 @@ onUnmounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.control-console__status-tag {
+  border-color: var(--card-border-color);
+  background: var(--color-gray-2);
+  color: var(--design-muted);
+  font-weight: 600;
+}
+
+.control-console__status-tag[data-status-tone="success"] {
+  border-color: var(--color-green-3);
+  background: var(--color-green-1);
+  color: var(--color-green-7);
+}
+
+.control-console__status-tag[data-status-tone="error"] {
+  border-color: var(--color-red-3);
+  background: var(--color-red-1);
+  color: var(--color-red-7);
+}
+
+.control-console__status-tag[data-status-tone="processing"] {
+  border-color: var(--color-gold-3);
+  background: var(--color-gold-1);
+  color: var(--color-gold-7);
 }
 
 .control-console__summary-header-actions {
@@ -1932,7 +1963,7 @@ onUnmounted(() => {
 }
 
 .control-console__summary-kicker {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1947,7 +1978,7 @@ onUnmounted(() => {
 
 .control-console__summary-desc {
   margin: 10px 0 0;
-  color: var(--color-gray-8);
+  color: var(--design-body);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -1962,13 +1993,15 @@ onUnmounted(() => {
 .control-console__summary-meta-item {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(241, 245, 249, 0.92);
+  border: 1px solid var(--card-border-color);
+  background: var(--design-canvas-soft);
+  color: var(--design-ink);
 }
 
 .control-console__summary-meta-label,
 .control-console__metric-label,
 .control-console__metric-detail {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 11px;
 }
 
@@ -2087,17 +2120,12 @@ onUnmounted(() => {
   gap: 6px;
   min-height: 104px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  border: 1px solid var(--card-border-color);
   border-radius: 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(248, 250, 252, 0.92) 100%
-  );
-  box-shadow:
-    0 4px 12px rgba(15, 23, 42, 0.04),
-    0 1px 3px rgba(15, 23, 42, 0.02);
-  --metric-accent: rgba(59, 130, 246, 0.35);
+  background: var(--design-canvas-soft);
+  color: var(--design-ink);
+  box-shadow: none;
+  --metric-accent: var(--color-blue-4);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
@@ -2105,9 +2133,7 @@ onUnmounted(() => {
 
 .control-console__metric-card:hover {
   transform: translateY(-2px);
-  box-shadow:
-    0 8px 24px rgba(15, 23, 42, 0.08),
-    0 2px 6px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .control-console__metric-card::before {
@@ -2122,19 +2148,19 @@ onUnmounted(() => {
 }
 
 .control-console__metric-card.is-success {
-  --metric-accent: rgba(22, 163, 74, 0.78);
+  --metric-accent: var(--color-green-5);
 }
 
 .control-console__metric-card.is-warning {
-  --metric-accent: rgba(245, 158, 11, 0.82);
+  --metric-accent: var(--color-gold-5);
 }
 
 .control-console__metric-card.is-danger {
-  --metric-accent: rgba(239, 68, 68, 0.78);
+  --metric-accent: var(--color-red-5);
 }
 
 .control-console__metric-card.is-muted {
-  --metric-accent: rgba(148, 163, 184, 0.72);
+  --metric-accent: var(--color-gray-6);
 }
 
 .control-console__metric-value {
@@ -2145,19 +2171,19 @@ onUnmounted(() => {
 }
 
 .control-console__metric-card.is-success .control-console__metric-value {
-  color: #15803d;
+  color: var(--color-green-7);
 }
 
 .control-console__metric-card.is-warning .control-console__metric-value {
-  color: #b45309;
+  color: var(--color-gold-7);
 }
 
 .control-console__metric-card.is-danger .control-console__metric-value {
-  color: #b91c1c;
+  color: var(--color-red-7);
 }
 
 .control-console__metric-card.is-muted .control-console__metric-value {
-  color: var(--color-gray-6);
+  color: var(--design-muted);
 }
 
 .control-console__metric-segments {
@@ -2176,11 +2202,11 @@ onUnmounted(() => {
   min-width: 0;
   padding: 6px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.52);
+  background: var(--design-surface-strong);
 }
 
 .control-console__metric-segment-label {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 10px;
   line-height: 1;
 }
@@ -2192,19 +2218,19 @@ onUnmounted(() => {
 }
 
 .control-console__metric-card.is-success .control-console__metric-segment-value {
-  color: #15803d;
+  color: var(--color-green-7);
 }
 
 .control-console__metric-card.is-warning .control-console__metric-segment-value {
-  color: #b45309;
+  color: var(--color-gold-7);
 }
 
 .control-console__metric-card.is-danger .control-console__metric-segment-value {
-  color: #b91c1c;
+  color: var(--color-red-7);
 }
 
 .control-console__metric-card.is-muted .control-console__metric-segment-value {
-  color: var(--color-gray-6);
+  color: var(--design-muted);
 }
 
 .control-console__metric-detail {
@@ -2237,10 +2263,10 @@ onUnmounted(() => {
 .control-console__player-chip {
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--card-border-color);
   border-radius: 14px;
-  background: rgba(248, 250, 252, 0.92);
-  color: inherit;
+  background: var(--design-canvas-soft);
+  color: var(--design-ink);
   text-align: left;
   cursor: pointer;
   transition:
@@ -2251,8 +2277,8 @@ onUnmounted(() => {
 
 .control-console__player-chip:hover {
   transform: translateY(-1px);
-  border-color: rgba(59, 130, 246, 0.26);
-  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+  border-color: var(--color-blue-4);
+  box-shadow: none;
 }
 
 .control-console__player-name,
@@ -2267,7 +2293,7 @@ onUnmounted(() => {
 
 .control-console__player-meta {
   margin-top: 4px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
 }
 

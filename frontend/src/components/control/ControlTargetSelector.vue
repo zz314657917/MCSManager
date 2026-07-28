@@ -8,28 +8,28 @@ import { computed } from "vue";
 
 const NODE_TINT_PALETTE = [
   {
-    chipBg: "rgba(37, 99, 235, 0.12)",
-    chipColor: "#1d4ed8"
+    chipBg: "var(--color-blue-1)",
+    chipColor: "var(--color-blue-7)"
   },
   {
-    chipBg: "rgba(5, 150, 105, 0.12)",
-    chipColor: "#047857"
+    chipBg: "var(--color-green-1)",
+    chipColor: "var(--color-green-7)"
   },
   {
-    chipBg: "rgba(217, 119, 6, 0.12)",
-    chipColor: "#b45309"
+    chipBg: "var(--color-gold-1)",
+    chipColor: "var(--color-gold-7)"
   },
   {
-    chipBg: "rgba(219, 39, 119, 0.12)",
-    chipColor: "#be185d"
+    chipBg: "var(--color-magenta-1)",
+    chipColor: "var(--color-magenta-7)"
   },
   {
-    chipBg: "rgba(124, 58, 237, 0.12)",
-    chipColor: "#6d28d9"
+    chipBg: "var(--color-purple-1)",
+    chipColor: "var(--color-purple-7)"
   },
   {
-    chipBg: "rgba(2, 132, 199, 0.12)",
-    chipColor: "#0369a1"
+    chipBg: "var(--color-cyan-1)",
+    chipColor: "var(--color-cyan-7)"
   }
 ];
 
@@ -277,7 +277,15 @@ const getNodeTintStyle = (target: ControlTarget) => {
                   <EditOutlined />
                 </template>
               </a-button>
-              <a-tag class="m-0" size="small" :color="getControlTargetStatusColor(target)">
+              <a-tag
+                class="m-0 control-target-selector__status-tag"
+                size="small"
+                :color="getControlTargetStatusColor(target)"
+                :data-status-tone="getControlTargetStatusColor(target)"
+                :data-testid="
+                  `control-target-status-${normalizeTestKey(target.daemonId)}-${target.mode}-${normalizeTestKey(target.instanceId)}`
+                "
+              >
                 {{ getControlTargetStatusText(target) }}
               </a-tag>
             </div>
@@ -311,12 +319,10 @@ const getNodeTintStyle = (target: ControlTarget) => {
 
 .control-panel {
   min-height: 0;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--card-border-color);
   border-radius: 20px;
   background: var(--background-color-white);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .control-panel__header {
@@ -348,7 +354,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
 .control-target-selector__filter-select {
   min-width: 148px;
   flex: 0 0 auto;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--design-canvas-soft);
   border-radius: 999px;
 }
 
@@ -378,17 +384,17 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__list--drawer::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--design-canvas-soft);
   border-radius: 4px;
 }
 
 .control-target-selector__list--drawer::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.4);
+  background: var(--color-blue-4);
   border-radius: 4px;
 }
 
 .control-target-selector__list--drawer::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.6);
+  background: var(--color-blue-5);
 }
 
 @media (min-width: 993px) {
@@ -413,10 +419,10 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__card {
-  border: 1px solid rgba(219, 226, 235, 0.92);
+  border: 1px solid var(--card-border-color);
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--design-canvas-soft);
   text-align: left;
   cursor: pointer;
   transition:
@@ -424,30 +430,30 @@ const getNodeTintStyle = (target: ControlTarget) => {
     background-color 0.18s ease,
     border-color 0.18s ease,
     box-shadow 0.18s ease;
-  color: inherit;
+  color: var(--design-ink);
 }
 
 .control-target-selector__card:hover {
   transform: translateY(-1px);
-  border-color: rgba(148, 163, 184, 0.58);
-  background: rgba(248, 250, 252, 0.98);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  border-color: var(--design-hairline-strong);
+  background: var(--inner-card-hover-bg);
+  box-shadow: none;
 }
 
 .control-target-selector__card.is-active {
-  border-color: rgba(37, 99, 235, 0.62);
-  background: rgba(248, 250, 252, 0.98);
+  border-color: var(--color-blue-5);
+  background: var(--color-blue-1);
   box-shadow:
     0 10px 22px rgba(37, 99, 235, 0.08),
-    inset 3px 0 0 rgba(37, 99, 235, 0.78);
+    inset 3px 0 0 var(--color-blue-6);
 }
 
 .control-target-selector__card.is-batch-selected {
-  border-color: rgba(37, 99, 235, 0.62);
-  background: rgba(239, 246, 255, 0.72);
+  border-color: var(--color-blue-5);
+  background: var(--color-blue-1);
   box-shadow:
     0 12px 26px rgba(37, 99, 235, 0.1),
-    inset 0 0 0 2px rgba(37, 99, 235, 0.2);
+    inset 0 0 0 2px var(--color-blue-3);
 }
 
 .control-target-selector__target-row {
@@ -488,6 +494,31 @@ const getNodeTintStyle = (target: ControlTarget) => {
   flex-shrink: 0;
 }
 
+.control-target-selector__status-tag {
+  border-color: var(--card-border-color);
+  background: var(--color-gray-2);
+  color: var(--design-muted);
+  font-weight: 600;
+}
+
+.control-target-selector__status-tag[data-status-tone="success"] {
+  border-color: var(--color-green-3);
+  background: var(--color-green-1);
+  color: var(--color-green-7);
+}
+
+.control-target-selector__status-tag[data-status-tone="error"] {
+  border-color: var(--color-red-3);
+  background: var(--color-red-1);
+  color: var(--color-red-7);
+}
+
+.control-target-selector__status-tag[data-status-tone="processing"] {
+  border-color: var(--color-gold-3);
+  background: var(--color-gold-1);
+  color: var(--color-gold-7);
+}
+
 .control-target-selector__card-title {
   font-weight: 700;
   line-height: 1.3;
@@ -505,13 +536,13 @@ const getNodeTintStyle = (target: ControlTarget) => {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--control-target-node-chip-color, var(--color-blue-7));
-  background: var(--control-target-node-chip-bg, rgba(59, 130, 246, 0.12));
-  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: var(--control-target-node-chip-bg, var(--color-blue-1));
+  border: 1px solid var(--card-border-color);
 }
 
 .control-target-selector__target-identity {
   min-width: 0;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -519,7 +550,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__card-subtitle {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   word-break: break-all;
 }
@@ -532,13 +563,13 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__favorite-button {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   min-width: 28px;
   padding-inline: 4px;
 }
 
 .control-target-selector__edit-button {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   min-width: 28px;
   padding-inline: 4px;
 }
@@ -563,7 +594,7 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 .control-target-selector__target-icon {
-  color: var(--color-gray-8);
+  color: var(--design-body);
   font-size: 16px;
 }
 </style>

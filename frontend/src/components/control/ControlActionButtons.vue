@@ -48,8 +48,7 @@ const emit = defineEmits<{
     <div class="control-action-buttons__mobile-groups">
       <div class="control-action-buttons__action-group control-action-buttons__action-group--primary">
         <a-button
-          class="control-action-buttons__mobile-button"
-          type="primary"
+          class="control-action-buttons__mobile-button control-action-buttons__start-button"
           :disabled="!target.daemonAvailable"
           data-testid="control-action-start"
           @click="emit('start')"
@@ -75,7 +74,7 @@ const emit = defineEmits<{
 
       <div class="control-action-buttons__action-group control-action-buttons__action-group--danger">
         <a-button
-          class="control-action-buttons__mobile-button"
+          class="control-action-buttons__mobile-button control-action-buttons__danger-button"
           danger
           ghost
           :disabled="!target.daemonAvailable"
@@ -89,7 +88,7 @@ const emit = defineEmits<{
         </a-button>
         <a-button
           v-if="target.mode === 'instance'"
-          class="control-action-buttons__mobile-button"
+          class="control-action-buttons__mobile-button control-action-buttons__danger-button control-action-buttons__terminate-button"
           danger
           :disabled="!target.daemonAvailable || target.status === 0"
           data-testid="control-action-terminate"
@@ -134,7 +133,11 @@ const emit = defineEmits<{
       </div>
       <div class="control-action-buttons__batch-groups">
         <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--primary">
-          <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+          <a-button
+            class="control-action-buttons__start-button"
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'start')"
+          >
             <template #icon>
               <PlayCircleOutlined />
             </template>
@@ -148,13 +151,24 @@ const emit = defineEmits<{
           </a-button>
         </div>
         <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--danger">
-          <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+          <a-button
+            class="control-action-buttons__danger-button"
+            danger
+            ghost
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'stop')"
+          >
             <template #icon>
               <PauseCircleOutlined />
             </template>
             {{ t("TXT_CODE_148d6467") }}
           </a-button>
-          <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+          <a-button
+            class="control-action-buttons__danger-button control-action-buttons__terminate-button"
+            danger
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'kill')"
+          >
             <template #icon>
               <CloseOutlined />
             </template>
@@ -173,8 +187,7 @@ const emit = defineEmits<{
     <div class="control-action-buttons__groups">
       <div class="control-action-buttons__action-group control-action-buttons__action-group--primary">
         <a-button
-          class="control-action-buttons__button"
-          type="primary"
+          class="control-action-buttons__button control-action-buttons__start-button"
           :disabled="!target.daemonAvailable"
           data-testid="control-action-start"
           @click="emit('start')"
@@ -200,7 +213,7 @@ const emit = defineEmits<{
 
       <div class="control-action-buttons__action-group control-action-buttons__action-group--danger">
         <a-button
-          class="control-action-buttons__button"
+          class="control-action-buttons__button control-action-buttons__danger-button"
           danger
           ghost
           :disabled="!target.daemonAvailable"
@@ -214,7 +227,7 @@ const emit = defineEmits<{
         </a-button>
         <a-button
           v-if="target.mode === 'instance'"
-          class="control-action-buttons__button"
+          class="control-action-buttons__button control-action-buttons__danger-button control-action-buttons__terminate-button"
           danger
           :disabled="!target.daemonAvailable || target.status === 0"
           data-testid="control-action-terminate"
@@ -259,7 +272,11 @@ const emit = defineEmits<{
       </div>
       <div class="control-action-buttons__batch-groups">
         <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--primary">
-          <a-button :loading="batchBusy" @click="emit('batchOperation', 'start')">
+          <a-button
+            class="control-action-buttons__start-button"
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'start')"
+          >
             <template #icon>
               <PlayCircleOutlined />
             </template>
@@ -273,13 +290,24 @@ const emit = defineEmits<{
           </a-button>
         </div>
         <div class="control-action-buttons__batch-grid control-action-buttons__batch-grid--danger">
-          <a-button danger ghost :loading="batchBusy" @click="emit('batchOperation', 'stop')">
+          <a-button
+            class="control-action-buttons__danger-button"
+            danger
+            ghost
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'stop')"
+          >
             <template #icon>
               <PauseCircleOutlined />
             </template>
             {{ t("TXT_CODE_148d6467") }}
           </a-button>
-          <a-button danger :loading="batchBusy" @click="emit('batchOperation', 'kill')">
+          <a-button
+            class="control-action-buttons__danger-button control-action-buttons__terminate-button"
+            danger
+            :loading="batchBusy"
+            @click="emit('batchOperation', 'kill')"
+          >
             <template #icon>
               <CloseOutlined />
             </template>
@@ -294,12 +322,10 @@ const emit = defineEmits<{
 <style lang="scss" scoped>
 .control-panel {
   min-height: 0;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--card-border-color);
   border-radius: 20px;
   background: var(--background-color-white);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .control-panel--actions {
@@ -316,14 +342,17 @@ const emit = defineEmits<{
   font-weight: 700;
 }
 
-.control-action-buttons__groups,
-.control-action-buttons__mobile-groups {
-  display: grid;
+.control-action-buttons__groups {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 0 18px;
 }
 
 .control-action-buttons__mobile-groups {
+  display: grid;
+  gap: 10px;
   padding: 0;
 }
 
@@ -335,14 +364,63 @@ const emit = defineEmits<{
 }
 
 .control-action-buttons__action-group--danger {
-  padding: 10px;
-  border: 1px solid rgba(239, 68, 68, 0.22);
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.05);
+  background: transparent;
+}
+
+.control-action-buttons__groups .control-action-buttons__action-group--danger {
+  padding-left: 10px;
+  border-left: 1px solid var(--card-border-color);
+}
+
+.control-action-buttons__mobile-groups .control-action-buttons__action-group--danger {
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border-color);
 }
 
 .control-action-buttons__button {
   min-width: 0;
+}
+
+.control-action-buttons__start-button {
+  border-color: var(--color-success);
+  background: var(--color-green-1);
+  color: var(--color-success);
+
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
+    border-color: var(--color-success);
+    background: var(--color-green-2);
+    color: var(--color-success);
+  }
+
+  &:disabled {
+    border-color: var(--card-border-color);
+    background: var(--color-gray-2);
+    color: var(--design-muted-soft);
+  }
+}
+
+.control-action-buttons__danger-button {
+  border-color: var(--color-danger);
+  background: transparent;
+  color: var(--color-danger);
+
+  &:not(:disabled):hover,
+  &:not(:disabled):focus-visible {
+    border-color: var(--color-danger);
+    background: var(--color-red-1);
+    color: var(--color-danger);
+  }
+
+  &:disabled {
+    border-color: var(--card-border-color);
+    background: var(--color-gray-2);
+    color: var(--design-muted-soft);
+  }
+}
+
+.control-action-buttons__terminate-button:not(:disabled) {
+  background: var(--color-red-1);
 }
 
 .control-action-buttons__feature-section {
@@ -356,16 +434,16 @@ const emit = defineEmits<{
   gap: 10px;
   margin: 14px 18px 0;
   padding: 12px;
-  border: 1px solid rgba(37, 99, 235, 0.18);
+  border: 1px solid var(--card-border-color);
   border-radius: 14px;
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--color-gray-2);
 }
 
 .control-action-buttons__feature-title {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -409,10 +487,8 @@ const emit = defineEmits<{
 }
 
 .control-action-buttons__batch-grid--danger {
-  padding: 10px;
-  border: 1px solid rgba(239, 68, 68, 0.22);
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.05);
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border-color);
 }
 
 .control-action-buttons__mobile-dock {
@@ -420,12 +496,10 @@ const emit = defineEmits<{
   flex-direction: column;
   gap: 10px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--card-border-color);
   border-radius: 20px;
   background: var(--background-color-white);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  box-shadow: none;
 }
 
 .control-action-buttons__mobile-button {

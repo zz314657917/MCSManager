@@ -5,6 +5,7 @@ import type { ControlTarget } from "@/types/control";
 export const getControlTargetStatusColor = (target?: ControlTarget) => {
   if (!target?.daemonAvailable) return "default";
   if (target.status === INSTANCE_STATUS_CODE.RUNNING) return "success";
+  if (target.status === INSTANCE_STATUS_CODE.STOPPED) return "error";
   if (
     target.status === INSTANCE_STATUS_CODE.STARTING ||
     target.status === INSTANCE_STATUS_CODE.STOPPING ||
