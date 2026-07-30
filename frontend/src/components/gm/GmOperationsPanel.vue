@@ -1065,12 +1065,10 @@ const executeUnmute = () =>
 
 .gm-operations-panel__card {
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--design-hairline);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 12px 28px rgba(15, 23, 42, 0.06),
-    0 2px 6px rgba(15, 23, 42, 0.03);
+  background: var(--design-surface-card);
+  box-shadow: none;
   min-width: 0;
 }
 
@@ -1091,8 +1089,8 @@ const executeUnmute = () =>
   min-width: 180px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(241, 245, 249, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--design-canvas-soft);
+  border: 1px solid var(--design-hairline-soft);
 }
 
 .gm-operations-panel__summary-item span,
@@ -1101,7 +1099,7 @@ const executeUnmute = () =>
 .gm-operations-panel__permission-main span,
 .gm-operations-panel__history-bottom span,
 .gm-operations-panel__inline-meta span {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .gm-operations-panel__summary-item span {
@@ -1166,13 +1164,13 @@ const executeUnmute = () =>
   gap: 4px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(220, 252, 231, 0.72);
-  color: #166534;
+  background: var(--color-green-1);
+  color: var(--color-green-8);
 }
 
 .gm-operations-panel__result.is-failed {
-  background: rgba(254, 226, 226, 0.8);
-  color: #991b1b;
+  background: var(--color-red-1);
+  color: var(--color-red-8);
 }
 
 .gm-operations-panel__inventory-layout {
@@ -1189,7 +1187,7 @@ const executeUnmute = () =>
 
 .gm-operations-panel__inventory-subhead,
 .gm-operations-panel__inventory-hotbar-label {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1211,7 +1209,7 @@ const executeUnmute = () =>
 
 .gm-operations-panel__inventory-side-entry span,
 .gm-operations-panel__inventory-popover div {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
 }
 
@@ -1236,14 +1234,14 @@ const executeUnmute = () =>
   min-width: 0;
   aspect-ratio: 1;
   padding: 0;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  border: 1px solid var(--design-hairline-strong);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(226, 232, 240, 0.92));
-  color: var(--color-gray-9);
+  background: var(--design-surface-strong);
+  color: var(--design-ink);
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  box-shadow: none;
 }
 
 .gm-operations-panel__inventory-slot strong {
@@ -1252,34 +1250,34 @@ const executeUnmute = () =>
 }
 
 .gm-operations-panel__inventory-slot.is-empty {
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(226, 232, 240, 0.52));
-  color: var(--color-gray-6);
+  background: var(--design-canvas-soft);
+  color: var(--design-muted);
   cursor: default;
 }
 
 .gm-operations-panel__inventory-slot.is-weapon {
-  background: linear-gradient(180deg, rgba(254, 242, 242, 0.98), rgba(254, 226, 226, 0.94));
-  color: #b91c1c;
+  background: var(--color-red-1);
+  color: var(--color-red-8);
 }
 
 .gm-operations-panel__inventory-slot.is-armor {
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(219, 234, 254, 0.94));
-  color: #1d4ed8;
+  background: var(--color-blue-1);
+  color: var(--color-blue-8);
 }
 
 .gm-operations-panel__inventory-slot.is-food {
-  background: linear-gradient(180deg, rgba(254, 249, 195, 0.98), rgba(254, 240, 138, 0.94));
-  color: #a16207;
+  background: var(--color-gold-1);
+  color: var(--color-gold-8);
 }
 
 .gm-operations-panel__inventory-slot.is-special {
-  background: linear-gradient(180deg, rgba(240, 253, 250, 0.98), rgba(204, 251, 241, 0.94));
-  color: #0f766e;
+  background: var(--color-cyan-1);
+  color: var(--color-cyan-8);
 }
 
 .gm-operations-panel__inventory-slot.is-item {
-  background: linear-gradient(180deg, rgba(243, 244, 246, 0.98), rgba(229, 231, 235, 0.94));
-  color: #374151;
+  background: var(--design-canvas-soft);
+  color: var(--design-ink);
 }
 
 .gm-operations-panel__inventory-amount {
@@ -1299,12 +1297,12 @@ const executeUnmute = () =>
 }
 
 .gm-operations-panel__inventory-popover strong {
-  color: var(--color-gray-9);
+  color: var(--design-ink);
 }
 
 .gm-operations-panel__inventory-grid--hotbar {
   padding-top: 4px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.22);
+  border-top: 1px dashed var(--design-hairline-strong);
 }
 
 .gm-operations-panel__grid,
@@ -1371,8 +1369,8 @@ const executeUnmute = () =>
 .gm-operations-panel__list-row {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(248, 250, 252, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--design-canvas-soft);
+  border: 1px solid var(--design-hairline-soft);
   min-width: 0;
 }
 
@@ -1430,8 +1428,8 @@ const executeUnmute = () =>
 .gm-operations-panel__history-row {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(248, 250, 252, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--design-canvas-soft);
+  border: 1px solid var(--design-hairline-soft);
 }
 
 .gm-operations-panel__history-top span,

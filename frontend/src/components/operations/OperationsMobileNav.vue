@@ -64,7 +64,7 @@ const navigateTo = (item: OperationsMobileNavItem) => {
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--design-hairline);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--design-surface-card);
   backdrop-filter: blur(14px);
   box-shadow: none;
 }

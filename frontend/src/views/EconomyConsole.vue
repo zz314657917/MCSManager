@@ -947,10 +947,7 @@ function openGmPage() {
   overflow-x: hidden;
 
   :deep(.ops-page-shell) {
-    background:
-      radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 28%),
-      radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 28%),
-      linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
+    background: var(--design-canvas);
   }
 
   :deep(.ops-page-shell--desktop-embedded) {
@@ -1023,7 +1020,7 @@ function openGmPage() {
 .economy-console__mobile-transaction-top span,
 .economy-console__mobile-transaction-meta,
 .economy-console__mobile-transaction p {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .economy-console__eyebrow {
@@ -1037,7 +1034,7 @@ function openGmPage() {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
 }
 
 .economy-console {
@@ -1066,10 +1063,10 @@ function openGmPage() {
   gap: 12px;
   align-items: center;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--design-hairline);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  background: var(--design-surface-card);
+  box-shadow: none;
 }
 
 .economy-console__filter {
@@ -1086,12 +1083,10 @@ function openGmPage() {
 .economy-console__server-card,
 .economy-console__panel,
 .economy-console__empty {
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--design-hairline);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: var(--design-surface-card);
+  box-shadow: none;
 }
 
 .economy-console__metric {
@@ -1109,23 +1104,23 @@ function openGmPage() {
 }
 
 .economy-console__metric--in {
-  --metric-accent: #16a34a;
+  --metric-accent: var(--color-green-7);
 }
 
 .economy-console__metric--out {
-  --metric-accent: #dc2626;
+  --metric-accent: var(--color-red-7);
 }
 
 .economy-console__metric--net {
-  --metric-accent: #2563eb;
+  --metric-accent: var(--color-blue-7);
 }
 
 .economy-console__metric--count {
-  --metric-accent: #7c3aed;
+  --metric-accent: var(--color-purple-7);
 }
 
 .economy-console__metric--delay {
-  --metric-accent: #f59e0b;
+  --metric-accent: var(--color-gold-7);
 }
 
 .economy-console__metric strong {
@@ -1133,7 +1128,7 @@ function openGmPage() {
   margin-top: 8px;
   font-size: 24px;
   line-height: 1.2;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
   word-break: break-word;
 }
 
@@ -1162,7 +1157,7 @@ function openGmPage() {
   margin-top: 8px;
   font-size: 22px;
   font-weight: 700;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
 }
 
 .economy-console__server-card p {
@@ -1201,14 +1196,14 @@ function openGmPage() {
 
 .economy-console__panel-head > span,
 .economy-console__panel-head > .anticon {
-  color: var(--color-gray-8);
+  color: var(--design-body);
   font-size: 20px;
 }
 
 .economy-console__panel-title {
   font-size: 18px;
   font-weight: 700;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
 }
 
 .economy-console__panel-meta {
@@ -1230,7 +1225,7 @@ function openGmPage() {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
 }
 
@@ -1241,11 +1236,11 @@ function openGmPage() {
 }
 
 .economy-console__legend-dot--in {
-  background: #10b981;
+  background: var(--color-green-7);
 }
 
 .economy-console__legend-dot--out {
-  background: #ef4444;
+  background: var(--color-red-7);
 }
 
 .economy-console__trend-summary {
@@ -1258,14 +1253,14 @@ function openGmPage() {
 .economy-console__trend-summary > div {
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--design-hairline-soft);
   border-radius: 10px;
-  background: rgba(248, 250, 252, 0.78);
+  background: var(--design-canvas-soft);
 }
 
 .economy-console__trend-summary span {
   display: block;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
 }
 
@@ -1273,7 +1268,7 @@ function openGmPage() {
   display: block;
   margin-top: 5px;
   overflow: hidden;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
   font-size: 18px;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1281,11 +1276,11 @@ function openGmPage() {
 }
 
 .economy-console__trend-summary strong.is-positive {
-  color: #047857;
+  color: var(--color-green-8);
 }
 
 .economy-console__trend-summary strong.is-negative {
-  color: #b91c1c;
+  color: var(--color-red-8);
 }
 
 .economy-console__trend-chart-wrap {
@@ -1303,12 +1298,12 @@ function openGmPage() {
 }
 
 .economy-console__trend-grid line {
-  stroke: rgba(148, 163, 184, 0.2);
+  stroke: var(--design-hairline);
   stroke-width: 1;
 }
 
 .economy-console__trend-axis text {
-  fill: var(--color-gray-6);
+  fill: var(--design-muted);
   font-size: 11px;
 }
 
@@ -1324,7 +1319,7 @@ function openGmPage() {
 }
 
 .economy-console__trend-point {
-  stroke: #fff;
+  stroke: var(--design-surface-card);
   stroke-width: 2;
 }
 
@@ -1397,14 +1392,14 @@ function openGmPage() {
   margin-top: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(226, 232, 240, 0.9);
+  background: var(--design-surface-strong);
 }
 
 .economy-console__source-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #10b981, #2563eb);
+  background: linear-gradient(90deg, var(--color-green-7), var(--color-blue-7));
 }
 
 .economy-console__ranking {
@@ -1423,7 +1418,7 @@ function openGmPage() {
 }
 
 .economy-console__ranking-actions > .anticon {
-  color: #0f766e;
+  color: var(--color-cyan-8);
   font-size: 20px;
 }
 
@@ -1447,9 +1442,9 @@ function openGmPage() {
   top: 0;
   z-index: 1;
   padding: 0 12px 8px;
-  color: var(--color-gray-6);
+  color: var(--design-muted);
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--design-surface-card);
 }
 
 .economy-console__ranking-list {
@@ -1462,9 +1457,9 @@ function openGmPage() {
   position: relative;
   overflow: hidden;
   padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--design-hairline-soft);
   border-radius: 12px;
-  background: rgba(248, 250, 252, 0.82);
+  background: var(--design-canvas-soft);
 }
 
 .economy-console__ranking-rank {
@@ -1474,24 +1469,24 @@ function openGmPage() {
   width: 42px;
   height: 32px;
   border-radius: 10px;
-  color: #0f172a;
+  color: var(--design-ink);
   font-weight: 700;
-  background: rgba(226, 232, 240, 0.86);
+  background: var(--design-surface-strong);
 }
 
 .economy-console__ranking-row:nth-child(1) .economy-console__ranking-rank {
-  color: #713f12;
-  background: rgba(250, 204, 21, 0.24);
+  color: var(--color-gold-8);
+  background: var(--color-gold-1);
 }
 
 .economy-console__ranking-row:nth-child(2) .economy-console__ranking-rank {
-  color: #334155;
-  background: rgba(203, 213, 225, 0.58);
+  color: var(--design-ink);
+  background: var(--design-surface-strong);
 }
 
 .economy-console__ranking-row:nth-child(3) .economy-console__ranking-rank {
-  color: #7c2d12;
-  background: rgba(251, 146, 60, 0.2);
+  color: var(--color-orange-8);
+  background: var(--color-orange-1);
 }
 
 .economy-console__ranking-player,
@@ -1505,7 +1500,7 @@ function openGmPage() {
 .economy-console__ranking-player strong,
 .economy-console__ranking-amount strong {
   overflow: hidden;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1514,7 +1509,7 @@ function openGmPage() {
 .economy-console__ranking-player span,
 .economy-console__ranking-amount span {
   overflow: hidden;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1525,20 +1520,20 @@ function openGmPage() {
   min-width: 58px;
   padding: 5px 9px;
   border-radius: 999px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-weight: 700;
   text-align: center;
-  background: rgba(226, 232, 240, 0.78);
+  background: var(--design-surface-strong);
 }
 
 .economy-console__ranking-change.is-up {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-green-8);
+  background: var(--color-green-1);
 }
 
 .economy-console__ranking-change.is-down {
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.11);
+  color: var(--color-red-8);
+  background: var(--color-red-1);
 }
 
 .economy-console__ranking-track {
@@ -1546,14 +1541,14 @@ function openGmPage() {
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(226, 232, 240, 0.78);
+  background: var(--design-surface-strong);
 }
 
 .economy-console__ranking-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #0ea5e9, #10b981);
+  background: linear-gradient(90deg, var(--color-cyan-7), var(--color-green-7));
 }
 
 .economy-console__audit {
@@ -1599,17 +1594,17 @@ function openGmPage() {
 }
 
 .economy-console__amount {
-  color: var(--color-gray-10);
+  color: var(--design-body);
   font-style: normal;
   font-weight: 700;
 }
 
 .economy-console__amount.is-positive {
-  color: #15803d;
+  color: var(--color-green-8);
 }
 
 .economy-console__amount.is-negative {
-  color: #b91c1c;
+  color: var(--color-red-8);
 }
 
 .economy-console__mobile-transactions {
@@ -1624,9 +1619,9 @@ function openGmPage() {
 .economy-console__mobile-transaction {
   min-width: 0;
   padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--design-hairline-soft);
   border-radius: 14px;
-  background: rgba(248, 250, 252, 0.88);
+  background: var(--design-canvas-soft);
 }
 
 .economy-console__mobile-transaction-top {

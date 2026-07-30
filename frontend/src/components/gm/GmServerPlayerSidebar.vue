@@ -247,12 +247,10 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
 .gm-sidebar__section {
   min-height: 0;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--design-hairline);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 16px 32px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: var(--design-surface-card);
+  box-shadow: none;
 }
 
 .gm-sidebar__section--players {
@@ -314,7 +312,7 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
 .gm-sidebar__group-copy span {
   margin-top: 2px;
   font-size: 12px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .gm-sidebar__server-card strong,
@@ -324,18 +322,18 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
 
 .gm-sidebar__server-meta,
 .gm-sidebar__player-meta {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
 }
 
 .gm-sidebar__server-card,
 .gm-sidebar__player-card {
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--design-hairline);
   border-radius: 14px;
   padding: 10px 12px;
   text-align: left;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
+  background: var(--design-canvas-soft);
   color: inherit;
   cursor: pointer;
   transition:
@@ -347,16 +345,14 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
 .gm-sidebar__server-card:hover,
 .gm-sidebar__player-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(37, 99, 235, 0.34);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.08);
+  border-color: var(--color-blue-7);
+  box-shadow: none;
 }
 
 .gm-sidebar__server-card.is-active,
 .gm-sidebar__player-card.is-active {
-  border-color: rgba(37, 99, 235, 0.5);
-  box-shadow:
-    0 14px 26px rgba(37, 99, 235, 0.12),
-    inset 0 0 0 1px rgba(37, 99, 235, 0.16);
+  border-color: var(--color-blue-7);
+  box-shadow: inset 0 0 0 1px var(--color-blue-7);
 }
 
 .gm-sidebar__server-card--compact {

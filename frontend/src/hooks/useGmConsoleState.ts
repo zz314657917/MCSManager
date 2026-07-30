@@ -262,7 +262,11 @@ export function useGmConsoleState() {
     }
   };
 
-  const loadPlayers = async (forceRequest = false, serverKey = selectedServerKey.value) => {
+  const loadPlayers = async (
+    forceRequest = false,
+    serverKey = selectedServerKey.value,
+    showToast = false
+  ) => {
     isPlayerLoading.value = true;
     try {
       await loadPlayersForServer(forceRequest, serverKey);
@@ -272,13 +276,13 @@ export function useGmConsoleState() {
         delete playersByServer.value[serverKey];
         selectedPlayerUuid.value = "";
       }
-      setError(error, "加载玩家列表失败。", true);
+      setError(error, "加载玩家列表失败。", showToast);
     } finally {
       isPlayerLoading.value = false;
     }
   };
 
-  const loadAllPlayers = async (forceRequest = false) => {
+  const loadAllPlayers = async (forceRequest = false, showToast = false) => {
     const targetServers = servers.value.slice();
     if (!targetServers.length) {
       playersByServer.value = {};
@@ -295,7 +299,7 @@ export function useGmConsoleState() {
         (item): item is PromiseRejectedResult => item.status === "rejected"
       );
       if (failed) {
-        setError(failed.reason, "加载玩家列表失败。", true);
+        setError(failed.reason, "加载玩家列表失败。", showToast);
         return;
       }
 
@@ -308,7 +312,8 @@ export function useGmConsoleState() {
   const loadPlayerDetails = async (
     forceRequest = false,
     serverKey = selectedServerKey.value,
-    playerUuid = selectedPlayerUuid.value
+    playerUuid = selectedPlayerUuid.value,
+    showToast = false
   ) => {
     const server = servers.value.find((item) => getGmServerKey(item) === serverKey);
     if (!server || !playerUuid) {
@@ -366,7 +371,7 @@ export function useGmConsoleState() {
       latestError.value = "";
     } catch (error) {
       if (serverKey === selectedServerKey.value && playerUuid === selectedPlayerUuid.value) {
-        setError(error, "加载玩家详情失败。", true);
+        setError(error, "加载玩家详情失败。", showToast);
       }
     } finally {
       if (serverKey === selectedServerKey.value && playerUuid === selectedPlayerUuid.value) {
@@ -417,6 +422,7 @@ export function useGmConsoleState() {
     options: {
       forceRequest?: boolean;
       reset?: boolean;
+      showToast?: boolean;
     } = {}
   ) => {
     const targetServers = servers.value.slice();
@@ -443,7 +449,7 @@ export function useGmConsoleState() {
         (item): item is PromiseRejectedResult => item.status === "rejected"
       );
       if (failed) {
-        setError(failed.reason, "加载聊天记录失败。");
+        setError(failed.reason, "加载聊天记录失败。", options.showToast);
         return;
       }
 
@@ -453,7 +459,7 @@ export function useGmConsoleState() {
     }
   };
 
-  const refreshCurrent = async (forceRequest = true) => {
+  const refreshCurrent = async (forceRequest = true, showToast = false) => {
     isRefreshing.value = true;
     latestError.value = "";
     try {
@@ -467,20 +473,26 @@ export function useGmConsoleState() {
       }
 
       await Promise.all([
-        loadAllPlayers(forceRequest),
+        loadAllPlayers(forceRequest, showToast),
         loadAllChats({
           forceRequest,
-          reset: true
+          reset: true,
+          showToast
         })
       ]);
 
       if (selectedPlayerUuid.value) {
-        await loadPlayerDetails(forceRequest, selectedServerKey.value, selectedPlayerUuid.value);
+        await loadPlayerDetails(
+          forceRequest,
+          selectedServerKey.value,
+          selectedPlayerUuid.value,
+          showToast
+        );
       } else {
         resetPlayerDetails();
       }
     } catch (error) {
-      setError(error, "刷新 GM 数据失败。", true);
+      setError(error, "刷新 GM 数据失败。", showToast);
     } finally {
       isRefreshing.value = false;
     }

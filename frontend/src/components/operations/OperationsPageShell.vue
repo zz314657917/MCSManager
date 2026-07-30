@@ -128,6 +128,13 @@ defineExpose({ isPhone });
 
 <style lang="scss" scoped>
 .ops-page-shell {
+  --ops-page-surface: var(--design-surface-card);
+  --ops-page-surface-soft: var(--design-canvas-soft);
+  --ops-page-surface-strong: var(--design-surface-strong);
+  --ops-page-border: var(--design-hairline);
+  --ops-page-border-strong: var(--design-hairline-strong);
+  --ops-page-ink: var(--design-ink);
+  --ops-page-muted: var(--design-muted);
   height: 100svh;
   overflow: hidden;
   width: 100%;
@@ -164,8 +171,8 @@ defineExpose({ isPhone });
   gap: 16px;
   padding: 18px 24px;
   border-bottom: 1px solid var(--design-hairline);
-  background: rgba(247, 247, 244, 0.94);
-  color: var(--design-ink);
+  background: var(--ops-page-surface);
+  color: var(--ops-page-ink);
   box-shadow: none;
   backdrop-filter: blur(12px);
 }
@@ -192,7 +199,7 @@ defineExpose({ isPhone });
 }
 
 .ops-page-shell__eyebrow {
-  color: var(--design-muted);
+  color: var(--ops-page-muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -202,7 +209,7 @@ defineExpose({ isPhone });
   margin: 4px 0 0;
   font-size: 28px;
   line-height: 1.1;
-  color: var(--design-ink);
+  color: var(--ops-page-ink);
 }
 
 .ops-page-shell__shell {

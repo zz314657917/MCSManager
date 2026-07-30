@@ -201,14 +201,14 @@ watch(
             </div>
           </template>
 
-          <a-button :loading="isRefreshing" @click="refreshCurrent(true)">
+          <a-button :loading="isRefreshing" @click="refreshCurrent(true, true)">
             <template #icon>
               <ReloadOutlined />
             </template>
             <span>刷新</span>
           </a-button>
         </template>
-        <a-button v-else :loading="isRefreshing" @click="refreshCurrent(true)">
+        <a-button v-else :loading="isRefreshing" @click="refreshCurrent(true, true)">
           <template #icon>
             <ReloadOutlined />
           </template>
@@ -247,7 +247,7 @@ watch(
             </template>
             <span>Control</span>
           </a-button>
-          <a-button :loading="isRefreshing" @click="refreshCurrent(true)">
+          <a-button :loading="isRefreshing" @click="refreshCurrent(true, true)">
             <template #icon>
               <ReloadOutlined />
             </template>
@@ -438,10 +438,7 @@ watch(
   overflow-x: hidden;
 
   :deep(.ops-page-shell) {
-    background:
-      radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 32%),
-      radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 26%),
-      linear-gradient(180deg, rgba(248, 250, 252, 0.94), rgba(241, 245, 249, 0.98));
+    background: var(--design-canvas);
   }
 }
 
@@ -452,7 +449,7 @@ watch(
   min-width: 0;
   padding: 10px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--design-surface-strong);
   backdrop-filter: blur(8px);
   font-size: 13px;
 }
@@ -465,7 +462,7 @@ watch(
 }
 
 .gm-console-page__header-pill--accent {
-  background: rgba(34, 197, 94, 0.16);
+  background: var(--color-green-1);
 }
 
 .gm-console-page__desktop-toolbar {
@@ -495,7 +492,7 @@ watch(
 }
 
 .gm-console-page__desktop-toolbar-eyebrow {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -506,18 +503,18 @@ watch(
   font-size: 28px;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--color-gray-13);
+  color: var(--design-ink);
 }
 
 .gm-console-page__desktop-toolbar .gm-console-page__header-pill {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  color: var(--color-gray-12);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  background: var(--design-surface-card);
+  border: 1px solid var(--design-hairline);
+  color: var(--design-ink);
+  box-shadow: none;
 }
 
 .gm-console-page__desktop-toolbar .gm-console-page__header-pill--accent {
-  background: rgba(34, 197, 94, 0.12);
+  background: var(--color-green-1);
 }
 
 .gm-console {
@@ -539,12 +536,10 @@ watch(
 .gm-console__summary-card,
 .gm-console__chat-panel,
 .gm-console__operations {
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--design-hairline);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: var(--design-surface-card);
+  box-shadow: none;
 }
 
 .gm-console__summary-card {
@@ -575,7 +570,7 @@ watch(
 .gm-console__chat-meta,
 .gm-console__metric span,
 .gm-console__message-meta {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .gm-console__summary-kicker {
@@ -613,8 +608,8 @@ watch(
 .gm-console__metric {
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(241, 245, 249, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--design-canvas-soft);
+  border: 1px solid var(--design-hairline-soft);
 }
 
 .gm-console__metric strong {
@@ -690,7 +685,7 @@ watch(
 
 .gm-console__chat-toolbar {
   padding: 16px 18px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  border-bottom: 1px solid var(--design-hairline-soft);
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -746,15 +741,15 @@ watch(
 }
 
 .gm-console__message--player {
-  --bubble-bg: rgba(219, 234, 254, 0.9);
+  --bubble-bg: var(--color-blue-1);
 }
 
 .gm-console__message--gm {
-  --bubble-bg: rgba(220, 252, 231, 0.92);
+  --bubble-bg: var(--color-green-1);
 }
 
 .gm-console__message--system {
-  --bubble-bg: rgba(241, 245, 249, 0.96);
+  --bubble-bg: var(--design-canvas-soft);
 }
 
 .gm-console__message-meta {
@@ -782,8 +777,8 @@ watch(
   width: fit-content;
   padding: 10px 12px;
   border-radius: 16px;
-  background: var(--bubble-bg, rgba(241, 245, 249, 0.96));
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--bubble-bg, var(--design-canvas-soft));
+  border: 1px solid var(--design-hairline-soft);
   line-height: 1.6;
   min-width: 0;
   word-break: break-word;
@@ -793,7 +788,7 @@ watch(
 
 .gm-console__message-icon {
   margin-top: 4px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .gm-console__message-author,

@@ -264,10 +264,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 <style lang="scss" scoped>
 .players-console {
   :deep(.ops-page-shell) {
-    background:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.16), transparent 34%),
-      radial-gradient(circle at top right, rgba(59, 130, 246, 0.14), transparent 28%),
-      linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(241, 245, 249, 0.96));
+    background: var(--design-canvas);
   }
 }
 
@@ -278,7 +275,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   min-width: 0;
   padding: 10px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--design-surface-strong);
   backdrop-filter: blur(8px);
   font-size: 13px;
 }
@@ -291,14 +288,14 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 }
 
 .players-console__header-pill--accent {
-  background: rgba(59, 130, 246, 0.18);
+  background: var(--color-blue-1);
 }
 
 .players-console__mode-tag {
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--color-always-white);
+  background: var(--design-surface-strong);
+  color: var(--design-ink);
 }
 
 .players-console__workspace {
@@ -311,12 +308,10 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 
 .player-panel {
   min-height: 0;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  border: 1px solid var(--design-hairline);
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow:
-    0 16px 36px rgba(15, 23, 42, 0.08),
-    0 2px 8px rgba(15, 23, 42, 0.04);
+  background: var(--design-surface-card);
+  box-shadow: none;
   backdrop-filter: blur(10px);
 }
 
@@ -345,10 +340,10 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 }
 
 .players-console__player-card {
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--design-hairline);
   border-radius: 16px;
   padding: 14px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(255, 255, 255, 0.98));
+  background: var(--design-canvas-soft);
   text-align: left;
   cursor: pointer;
   transition:
@@ -360,15 +355,13 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 
 .players-console__player-card:hover {
   transform: translateY(-1px);
-  border-color: rgba(59, 130, 246, 0.26);
-  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.08);
+  border-color: var(--color-blue-7);
+  box-shadow: none;
 }
 
 .players-console__player-card.is-active {
-  border-color: rgba(59, 130, 246, 0.48);
-  box-shadow:
-    0 14px 28px rgba(59, 130, 246, 0.12),
-    inset 0 0 0 1px rgba(59, 130, 246, 0.22);
+  border-color: var(--color-blue-7);
+  box-shadow: inset 0 0 0 1px var(--color-blue-7);
 }
 
 .players-console__player-main {
@@ -384,8 +377,8 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.22));
-  color: var(--color-blue-7);
+  background: var(--color-blue-1);
+  color: var(--color-blue-8);
   font-size: 18px;
   font-weight: 700;
   flex-shrink: 0;
@@ -417,7 +410,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 .players-console__chat-meta,
 .players-console__composer-note,
 .players-console__bind-card p {
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .players-console__player-subtitle {
@@ -483,20 +476,20 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
 .players-console__summary-card {
   padding: 12px;
   border-radius: 16px;
-  background: rgba(241, 245, 249, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--design-canvas-soft);
+  border: 1px solid var(--design-hairline-soft);
 }
 
 .players-console__summary-card.is-success {
-  background: rgba(220, 252, 231, 0.8);
+  background: var(--color-green-1);
 }
 
 .players-console__summary-card.is-warning {
-  background: rgba(254, 249, 195, 0.84);
+  background: var(--color-gold-1);
 }
 
 .players-console__summary-card.is-muted {
-  background: rgba(241, 245, 249, 0.9);
+  background: var(--design-canvas-soft);
 }
 
 .players-console__summary-label {
@@ -523,7 +516,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   justify-content: space-between;
   gap: 12px;
   padding: 18px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  border-bottom: 1px solid var(--design-hairline);
 }
 
 .players-console__chat-title {
@@ -549,9 +542,7 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 32%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98));
+  background: var(--design-canvas-soft);
 }
 
 .players-console__message {
@@ -580,34 +571,34 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
-  color: var(--color-gray-7);
+  color: var(--design-muted);
 }
 
 .players-console__message-bubble {
   padding: 12px 14px;
   border-radius: 16px;
-  background: rgba(226, 232, 240, 0.8);
+  background: var(--design-surface-strong);
   line-height: 1.55;
   word-break: break-word;
 }
 
 .players-console__message--player .players-console__message-bubble {
-  background: rgba(219, 234, 254, 0.92);
+  background: var(--color-blue-1);
 }
 
 .players-console__message--web .players-console__message-bubble {
-  background: rgba(220, 252, 231, 0.92);
+  background: var(--color-green-1);
 }
 
 .players-console__message--system .players-console__message-bubble {
-  background: rgba(248, 250, 252, 0.96);
-  border: 1px dashed rgba(148, 163, 184, 0.38);
+  background: var(--design-canvas-soft);
+  border: 1px dashed var(--design-hairline-strong);
   text-align: center;
 }
 
 .players-console__composer {
   padding: 16px 18px 18px;
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  border-top: 1px solid var(--design-hairline);
 }
 
 .players-console__composer-note {
@@ -638,8 +629,8 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   min-height: 112px;
   padding: 14px;
   border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(255, 255, 255, 0.98));
+  border: 1px solid var(--design-hairline);
+  background: var(--design-canvas-soft);
 }
 
 .players-console__bind-card strong {
@@ -658,8 +649,8 @@ const getBindingToneClass = (status: PlayerBindingStatus) => {
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--color-blue-6);
+  background: var(--color-blue-1);
+  color: var(--color-blue-8);
   font-size: 16px;
 }
 
