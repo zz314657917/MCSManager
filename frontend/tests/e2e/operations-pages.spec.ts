@@ -13,6 +13,27 @@ const parseCompactNumber = (value: string) => {
   return Number(digits);
 };
 
+const parseRgb = (color: string) => color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [];
+
+const relativeLuminance = (color: string) => {
+  const channels = parseRgb(color).map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+};
+
+const contrastRatio = (foreground: string, background: string) => {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  return (
+    (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+    (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+  );
+};
+
 test("control desktop preview supports target switch and command flow", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
   await page.setViewportSize({ width: 2000, height: 900 });
@@ -53,6 +74,82 @@ test("control desktop preview supports target switch and command flow", async ({
   await expect(terminal).toContainText("[instance] Lobby is now running.");
 });
 
+test("control desktop preview uses the remaining viewport height for the terminal", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面布局仅在桌面项目执行");
+  await page.setViewportSize({ width: 2000, height: 900 });
+
+  await gotoPreviewRoute(page, "/control", "control-console");
+
+  const workspace = page.locator(".control-console__workspace");
+  const terminalPanel = page.getByTestId("control-terminal-panel");
+  const actionsPanel = page.getByTestId("control-actions-desktop");
+  const [workspaceBox, terminalBox, actionsBox] = await Promise.all([
+    workspace.boundingBox(),
+    terminalPanel.boundingBox(),
+    actionsPanel.boundingBox()
+  ]);
+
+  expect(workspaceBox).not.toBeNull();
+  expect(terminalBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+
+  if (workspaceBox && terminalBox && actionsBox) {
+    expect(actionsBox.y).toBeGreaterThan(terminalBox.y + terminalBox.height);
+    expect(Math.abs(workspaceBox.y + workspaceBox.height - (actionsBox.y + actionsBox.height))).toBeLessThanOrEqual(2);
+  }
+});
+
+test("control desktop toolbar keeps target labels next to the title", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面布局仅在桌面项目执行");
+  await page.setViewportSize({ width: 2000, height: 900 });
+
+  await gotoPreviewRoute(page, "/control", "control-console");
+
+  const toolbarTitleWrap = page.locator(".control-console__desktop-toolbar-title-wrap");
+  const toolbarTitle = page.locator(".control-console__desktop-toolbar-title");
+  const toolbarPills = page.locator(".control-console__desktop-toolbar-pills");
+  const toolbarActions = page.locator(".control-console__desktop-toolbar-actions");
+  const targetListTitle = page.locator(".control-target-selector__header-copy > span:first-child");
+  const targetFilter = page.getByTestId("control-target-filter");
+  await expect(toolbarActions.getByRole("button", { name: /GM/ })).toHaveCount(0);
+
+  const [toolbarTitleWrapBox, toolbarTitleBox, toolbarPillsBox, toolbarActionsBox, targetListTitleBox, targetFilterBox] = await Promise.all([
+    toolbarTitleWrap.boundingBox(),
+    toolbarTitle.boundingBox(),
+    toolbarPills.boundingBox(),
+    toolbarActions.boundingBox(),
+    targetListTitle.boundingBox(),
+    targetFilter.boundingBox()
+  ]);
+
+  expect(toolbarTitleWrapBox).not.toBeNull();
+  expect(toolbarTitleBox).not.toBeNull();
+  expect(toolbarPillsBox).not.toBeNull();
+  expect(toolbarActionsBox).not.toBeNull();
+  expect(targetListTitleBox).not.toBeNull();
+  expect(targetFilterBox).not.toBeNull();
+
+  if (toolbarTitleWrapBox && toolbarTitleBox && toolbarPillsBox && toolbarActionsBox && targetListTitleBox && targetFilterBox) {
+    expect(toolbarPillsBox.x - (toolbarTitleBox.x + toolbarTitleBox.width)).toBeLessThanOrEqual(24);
+    expect(Math.abs(toolbarTitleWrapBox.y + toolbarTitleWrapBox.height / 2 - (toolbarActionsBox.y + toolbarActionsBox.height / 2))).toBeLessThanOrEqual(2);
+    expect(targetListTitleBox.height).toBeLessThanOrEqual(24);
+    expect(Math.abs(targetListTitleBox.y + targetListTitleBox.height / 2 - (targetFilterBox.y + targetFilterBox.height / 2))).toBeLessThanOrEqual(4);
+  }
+});
+
+test("control target list header does not duplicate the batch selection count", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面布局仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/control", "control-console");
+
+  const targetSelector = page.getByTestId("control-target-selector");
+  const headerTags = targetSelector.locator(".control-panel__header .ant-tag");
+  await expect(headerTags).toHaveCount(1);
+
+  await targetSelector.locator(".control-target-selector__batch-checkbox").first().click();
+  await expect(headerTags).toHaveCount(1);
+});
+
 test("control target statuses stay distinct in light and dark themes", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
 
@@ -75,24 +172,6 @@ test("control target statuses stay distinct in light and dark themes", async ({ 
   );
   const summaryMetaItem = page.locator(".control-console__summary-meta-item").first();
   const metricCard = page.locator(".control-console__metric-card").first();
-  const parseColor = (color: string) => color.match(/[\d.]+/g)?.slice(0, 3).map(Number) || [];
-  const relativeLuminance = (color: string) => {
-    const channels = parseColor(color).map((channel) => {
-      const normalized = channel / 255;
-      return normalized <= 0.03928
-        ? normalized / 12.92
-        : Math.pow((normalized + 0.055) / 1.055, 2.4);
-    });
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
-  };
-  const contrastRatio = (foreground: string, background: string) => {
-    const foregroundLuminance = relativeLuminance(foreground);
-    const backgroundLuminance = relativeLuminance(background);
-    return (
-      (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
-      (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
-    );
-  };
 
   for (const theme of [
     { storageValue: "1", bodyClass: "app-light-theme" },
@@ -116,8 +195,8 @@ test("control target statuses stay distinct in light and dark themes", async ({ 
         status.evaluate((element) => window.getComputedStyle(element).color)
       )
     );
-    const [runningRed, runningGreen] = parseColor(runningColor);
-    const [stoppedRed, stoppedGreen] = parseColor(stoppedColor);
+    const [runningRed, runningGreen] = parseRgb(runningColor);
+    const [stoppedRed, stoppedGreen] = parseRgb(stoppedColor);
     const cardColors = await runningCard.evaluate((element) => {
       const style = window.getComputedStyle(element);
       return { background: style.backgroundColor, foreground: style.color };
@@ -248,6 +327,43 @@ test("players desktop preview remains available as standalone page", async ({ pa
   await gotoPreviewRoute(page, "/players", "players-console");
   await expect(page.getByTestId("players-console")).toContainText(/玩家互动|Players/);
   await expect(page.getByTestId("gm-console")).toHaveCount(0);
+});
+
+test("operations views use readable light and dark surfaces", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面主题检查仅在桌面项目执行");
+
+  const pages = [
+    { path: "/gm/chat", readyTestId: "gm-console", panel: ".gm-console__chat-panel" },
+    { path: "/gm", readyTestId: "gm-console", panel: ".gm-console__summary-card" },
+    { path: "/economy", readyTestId: "economy-console", panel: ".economy-console__metric" },
+    { path: "/players", readyTestId: "players-console", panel: ".player-panel" }
+  ];
+
+  for (const theme of [
+    { storageValue: "1", bodyClass: "app-light-theme", isDark: false },
+    { storageValue: "2", bodyClass: "app-dark-theme", isDark: true }
+  ]) {
+    for (const item of pages) {
+      await gotoPreviewRoute(page, item.path, item.readyTestId);
+      await page.evaluate(
+        ({ key, value }) => window.localStorage.setItem(key, value),
+        { key: "THEME_KEY", value: theme.storageValue }
+      );
+      await page.reload();
+      await expect(page.getByTestId(item.readyTestId)).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("body")).toHaveClass(new RegExp(theme.bodyClass));
+
+      const panel = page.locator(item.panel).first();
+      const colors = await panel.evaluate((element) => {
+        const style = window.getComputedStyle(element);
+        return { background: style.backgroundColor, foreground: style.color };
+      });
+      const backgroundLuminance = relativeLuminance(colors.background);
+
+      expect(theme.isDark ? backgroundLuminance : 1 - backgroundLuminance).toBeLessThan(0.25);
+      expect(contrastRatio(colors.foreground, colors.background)).toBeGreaterThan(4.5);
+    }
+  }
 });
 
 test("gm desktop preview supports player selection and economy action", async ({ page }, testInfo) => {
