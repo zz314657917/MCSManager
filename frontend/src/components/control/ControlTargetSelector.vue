@@ -164,9 +164,6 @@ const getNodeTintStyle = (target: ControlTarget) => {
         <div class="control-target-selector__header-copy">
           <span>{{ t("TXT_CODE_d655beec") }}</span>
           <a-tag>{{ currentTargets.length }}</a-tag>
-          <a-tag v-if="selectedTargetKeys.length" color="blue">
-            {{ t("TXT_CODE_432cbc38") }} {{ selectedTargetKeys.length }} {{ t("TXT_CODE_5cd3b4bd") }}
-          </a-tag>
           <a-button
             v-if="batchSelectionEnabled && visibleInstanceTargets.length"
             type="link"
@@ -398,6 +395,25 @@ const getNodeTintStyle = (target: ControlTarget) => {
 }
 
 @media (min-width: 993px) {
+  .control-panel__header {
+    gap: 8px;
+    padding: 14px 12px 10px;
+  }
+
+  .control-target-selector__header-copy {
+    flex: 1 1 auto;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .control-target-selector__header-copy > span {
+    flex: 0 0 auto;
+  }
+
+  .control-target-selector__filter-select {
+    min-width: 104px;
+  }
+
   .control-target-selector:not(.control-target-selector--drawer) {
     height: calc(100svh - 180px);
     max-height: calc(100svh - 180px);

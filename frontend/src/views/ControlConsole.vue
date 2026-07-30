@@ -1068,12 +1068,6 @@ onUnmounted(() => {
         </div>
 
         <div class="control-console__desktop-toolbar-actions">
-          <a-button @click="openPlayersPage">
-            <template #icon>
-              <TeamOutlined />
-            </template>
-            <span>{{ t("TXT_CODE_GM_MANAGEMENT") }}</span>
-          </a-button>
           <a-button @click="openLegacyInstancePage">
             <template #icon>
               <AppstoreOutlined />
@@ -1645,7 +1639,7 @@ onUnmounted(() => {
 
 .control-console__desktop-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 0 0 4px;
@@ -1661,8 +1655,13 @@ onUnmounted(() => {
 }
 
 .control-console__desktop-toolbar-main {
-  flex: 1;
-  justify-content: space-between;
+  flex: 0 1 auto;
+  justify-content: flex-start;
+}
+
+.control-console__desktop-toolbar-actions {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .control-console__desktop-toolbar-title-wrap {
@@ -1816,22 +1815,43 @@ onUnmounted(() => {
 }
 
 @media (min-width: 993px) {
-  .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__shell),
+  .control-console :deep(.ops-page-shell--desktop-embedded) {
+    height: calc(100svh - 64px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__shell) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__workspace) {
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .control-console__desktop-toolbar {
+    flex-shrink: 0;
   }
 
   .control-console__workspace {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(420px, 1fr);
-    grid-template-rows: minmax(520px, calc(100svh - 360px)) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     grid-template-areas:
       "terminal summary"
       "actions summary";
     align-items: stretch;
+    flex: 1 1 auto;
     height: auto;
-    min-height: calc(100svh - 180px);
-    overflow: visible;
+    min-height: 0;
+    overflow: hidden;
     transition:
       grid-template-columns 0.24s ease,
       column-gap 0.24s ease;
