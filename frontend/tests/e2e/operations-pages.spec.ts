@@ -470,3 +470,62 @@ test("gm chat mobile preview keeps chat panel within viewport and supports nav s
   await page.getByTestId("mobile-nav-item-control").click();
   await expect(page.getByTestId("control-console")).toBeVisible();
 });
+
+test("gm desktop preview sends a broadcast and private message to the selected player", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/gm/chat", "gm-console");
+
+  const chatInput = page.getByTestId("gm-chat-input");
+  await chatInput.fill("预览广播：活动将在五分钟后开始");
+  await page.getByTestId("gm-chat-send").click();
+  await expect(page.getByTestId("gm-chat-body")).toContainText("预览广播：活动将在五分钟后开始");
+  await expect(chatInput).toHaveValue("");
+
+  await page.getByTestId("gm-player-card-relay-home-a-survival-main-preview-player-1").click();
+  await page.getByTestId("gm-chat-target").locator("label.ant-segmented-item").filter({ hasText: "私聊" }).click();
+  await chatInput.fill("预览私聊：请领取补偿");
+  await page.getByTestId("gm-chat-send").click();
+  await expect(page.getByTestId("gm-chat-body")).toContainText("预览私聊：请领取补偿");
+});
+
+test("economy preview confirms add, deduct, and set balance operations", async ({ page }) => {
+  await gotoPreviewRoute(page, "/economy", "economy-console");
+
+  const actionDialog = page.getByRole("dialog");
+  const openAction = async () => {
+    const action = page.locator('[data-testid^="economy-transaction-action-"]').first();
+    await expect(action).toBeEnabled();
+    await action.click();
+    await expect(actionDialog).toBeVisible();
+  };
+  const confirmAction = async (expectedTitle: RegExp, expectedReason: string) => {
+    await actionDialog.getByRole("button", { name: "下一步" }).click();
+    const confirmDialog = page.locator(".ant-modal-confirm");
+    await expect(confirmDialog).toContainText(expectedTitle);
+    await confirmDialog.getByRole("button", { name: /确认执行/ }).click();
+    await expect(page.getByTestId("economy-console")).toContainText(expectedReason);
+  };
+
+  await openAction();
+  await actionDialog.getByRole("spinbutton", { name: "输入余额数值" }).fill("1200");
+  await actionDialog.getByRole("button", { name: "下一步" }).click();
+  const cancelledConfirm = page.locator(".ant-modal-confirm");
+  await expect(cancelledConfirm).toContainText("确认增加余额");
+  await cancelledConfirm.getByRole("button", { name: /取\s*消/ }).click();
+  await expect(page.getByTestId("economy-console")).not.toContainText("GM 增加余额");
+
+  await openAction();
+  await actionDialog.getByRole("spinbutton", { name: "输入余额数值" }).fill("1200");
+  await confirmAction(/确认增加余额/, "GM 增加余额");
+
+  await openAction();
+  await actionDialog.locator("label.ant-segmented-item").filter({ hasText: "扣除" }).click();
+  await actionDialog.getByRole("spinbutton", { name: "输入余额数值" }).fill("200");
+  await confirmAction(/确认扣除余额/, "GM 扣除余额");
+
+  await openAction();
+  await actionDialog.locator("label.ant-segmented-item").filter({ hasText: "设置" }).click();
+  await actionDialog.getByRole("spinbutton", { name: "输入余额数值" }).fill("8800");
+  await confirmAction(/确认设置余额/, "GM 设置余额");
+});

@@ -159,6 +159,73 @@ router.get("/:daemonId/:instanceId/chat", permission({ level: ROLE.ADMIN }), asy
   }
 });
 
+router.post("/chat/send", permission({ level: ROLE.ADMIN }), async (ctx) => {
+  const request = ctx.request.body as IMcsmGmChatSendRequest;
+  const operatorName = getUserNameBySession(ctx) || "unknown";
+  const target = request?.target;
+  const actionKind: IMcsmGmActionKind = target === "private" ? "chat_private" : "chat_broadcast";
+  const failValidation = async (message: string) => {
+    await gmAuditService.append({
+      operatorName,
+      daemonId: request?.daemonId || "",
+      instanceId: request?.instanceId || "",
+      playerUuid: request?.playerUuid || "",
+      playerName: request?.playerUuid || (target === "broadcast" ? "all players" : "unknown"),
+      actionKind,
+      success: false,
+      message
+    });
+    ctx.status = 400;
+    ctx.body = message;
+  };
+
+  if (target !== "broadcast" && target !== "private") {
+    await failValidation("target must be broadcast or private.");
+    return;
+  }
+  const message = String(request?.message || "").trim();
+  if (!request?.daemonId || !request?.instanceId || !message) {
+    await failValidation("daemonId, instanceId and message are required.");
+    return;
+  }
+  if (target === "private" && !request.playerUuid) {
+    await failValidation("playerUuid is required for private chat.");
+    return;
+  }
+
+  try {
+    const result = await requestRemote<IMcsmGmChatSendResult>(request.daemonId, "gm/chat/send", {
+      ...request,
+      message,
+      operatorName
+    });
+    result.daemonId = request.daemonId;
+    await gmAuditService.append({
+      operatorName,
+      daemonId: result.daemonId,
+      instanceId: result.instanceId,
+      playerUuid: result.playerUuid || "",
+      playerName: result.playerName || (result.target === "broadcast" ? "all players" : "unknown"),
+      actionKind,
+      success: result.success,
+      message: result.message
+    });
+    ctx.body = result;
+  } catch (error) {
+    await gmAuditService.append({
+      operatorName,
+      daemonId: request.daemonId,
+      instanceId: request.instanceId,
+      playerUuid: request.playerUuid || "",
+      playerName: request.playerUuid || (request.target === "broadcast" ? "all players" : "unknown"),
+      actionKind,
+      success: false,
+      message: error instanceof Error ? error.message : String(error)
+    });
+    handleRouteError(ctx, error);
+  }
+});
+
 router.get(
   "/:daemonId/:instanceId/players/:playerUuid/balances",
   permission({ level: ROLE.ADMIN }),

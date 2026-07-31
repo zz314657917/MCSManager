@@ -2,6 +2,7 @@ import {
   gmAuditApi,
   gmBalancesApi,
   gmChatApi,
+  gmChatSendApi,
   gmExecuteActionApi,
   gmLuckPermsApi,
   gmModerationApi,
@@ -66,7 +67,7 @@ const mergeChatMessages = (current: IMcsmGmChatMessage[], incoming: IMcsmGmChatM
 };
 
 export type GmPanelActionPayload =
-  | { kind: "economy_deposit" | "economy_withdraw"; amount: number }
+  | { kind: "economy_deposit" | "economy_withdraw" | "economy_set"; amount: number }
   | { kind: "points_give" | "points_take"; amount: number }
   | { kind: "lp_group_add" | "lp_group_switch" | "lp_group_remove"; group: string }
   | { kind: "lp_permission_set" | "lp_permission_unset"; node: string }
@@ -82,6 +83,7 @@ export function useGmConsoleState() {
   const luckPermsRequest = gmLuckPermsApi();
   const moderationRequest = gmModerationApi();
   const executeActionRequest = gmExecuteActionApi();
+  const sendChatRequest = gmChatSendApi();
   const auditRequest = gmAuditApi();
 
   const nodes = ref<IMcsmGmOverviewNode[]>([]);
@@ -101,6 +103,7 @@ export function useGmConsoleState() {
   const isChatLoading = ref(false);
   const isDetailLoading = ref(false);
   const isExecutingAction = ref(false);
+  const isSendingChat = ref(false);
   const latestError = ref("");
   const nextChatCursorByServer = ref<Record<string, string | undefined>>({});
   const pendingSelectedPlayerUuid = ref("");
@@ -593,6 +596,64 @@ export function useGmConsoleState() {
     }
   };
 
+  const sendChat = async (payload: Pick<IMcsmGmChatSendRequest, "target" | "message">) => {
+    const server = currentServer.value;
+    const message = payload.message.trim();
+    if (!server) {
+      setError(new Error("请先选择一个实例。"), "请选择聊天实例。", true);
+      return false;
+    }
+    if (!message) {
+      setError(new Error("消息不能为空。"), "请输入聊天内容。", true);
+      return false;
+    }
+    if (message.length > 500) {
+      setError(new Error("消息不能超过 500 个字符。"), "消息不能超过 500 个字符。", true);
+      return false;
+    }
+
+    const player = currentPlayer.value;
+    if (payload.target === "private" && (!player || !player.online)) {
+      setError(new Error("私聊需要选择当前实例中的在线玩家。"), "请选择在线玩家后再私聊。", true);
+      return false;
+    }
+
+    isSendingChat.value = true;
+    latestError.value = "";
+    try {
+      const response = await sendChatRequest.execute({
+        data: {
+          daemonId: server.daemonId,
+          instanceId: server.instanceId,
+          target: payload.target,
+          message,
+          playerUuid: payload.target === "private" ? player?.playerUuid : undefined
+        }
+      });
+      const result = response.value;
+      if (!result) {
+        throw new Error("聊天发送返回了空响应。");
+      }
+      if (!result.success) {
+        setError(new Error(result.message), result.message, true);
+        return false;
+      }
+
+      await loadChatForServer({
+        forceRequest: true,
+        reset: false,
+        serverKey: getGmServerKey(server)
+      });
+      latestError.value = "";
+      return true;
+    } catch (error) {
+      setError(error, "聊天发送失败。", true);
+      return false;
+    } finally {
+      isSendingChat.value = false;
+    }
+  };
+
   watch(
     selectedServerKey,
     async (serverKey) => {
@@ -681,10 +742,12 @@ export function useGmConsoleState() {
     isChatLoading,
     isDetailLoading,
     isExecutingAction,
+    isSendingChat,
     latestError,
     selectServer,
     selectPlayer: selectPlayerFromServer,
     refreshCurrent,
-    executeAction
+    executeAction,
+    sendChat
   };
 }

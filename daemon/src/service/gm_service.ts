@@ -282,6 +282,8 @@ class GmService {
         return { action: "economy", operation: "deposit", playerUuid: request.playerUuid, amount: request.amount };
       case "economy_withdraw":
         return { action: "economy", operation: "withdraw", playerUuid: request.playerUuid, amount: request.amount };
+      case "economy_set":
+        return { action: "economy", operation: "set", playerUuid: request.playerUuid, amount: request.amount };
       case "points_give":
         return { action: "points", operation: "give", playerUuid: request.playerUuid, amount: request.amount };
       case "points_take":
@@ -749,6 +751,73 @@ class GmService {
     };
   }
 
+  public async sendChat(request: IMcsmGmChatSendRequest): Promise<IMcsmGmChatSendResult> {
+    if (request.target !== "broadcast" && request.target !== "private") {
+      const error: any = new Error("target must be broadcast or private.");
+      error.status = 400;
+      throw error;
+    }
+    const message = normalizeText(request.message);
+    if (!message) {
+      const error: any = new Error("message is required.");
+      error.status = 400;
+      throw error;
+    }
+    if (message.length > 500) {
+      const error: any = new Error("message must not exceed 500 characters.");
+      error.status = 400;
+      throw error;
+    }
+
+    const target = request.target;
+    const { instance, snapshot } = this.ensureSnapshotOrThrow(request.instanceId);
+    const player =
+      target === "private"
+        ? snapshot.players.find((item) => item.playerUuid === normalizeText(request.playerUuid) && item.online)
+        : undefined;
+    if (target === "private" && !player) {
+      const error: any = new Error("Private chat requires an online player in the current GM snapshot.");
+      error.status = 409;
+      throw error;
+    }
+
+    const response = await this.callController(request.instanceId, {
+      action: "chat",
+      operation: target,
+      message,
+      playerUuid: player?.playerUuid
+    });
+    const success = response.ok && response.statusCode < 400;
+    const updatedAt = new Date().toISOString();
+    const result: IMcsmGmChatSendResult = {
+      success,
+      daemonId: "",
+      instanceId: request.instanceId,
+      target,
+      playerUuid: player?.playerUuid,
+      playerName: normalizeText(response.data.playerName) || player?.playerName,
+      message: response.message || (success ? "Chat message delivered." : "Chat message rejected."),
+      updatedAt
+    };
+
+    if (success) {
+      await this.appendChatLog(request.instanceId, {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        daemonId: "",
+        instanceId: request.instanceId,
+        playerName: normalizeText((request as AnyRecord).operatorName) || "GM",
+        senderType: "gm",
+        channel: target,
+        tellPlayerName: player?.playerName,
+        source: "panel",
+        text: message,
+        time: updatedAt
+      });
+    }
+
+    return result;
+  }
+
   public async getBalances(instanceId: string, playerUuid: string) {
     return this.queryBalances(instanceId, playerUuid);
   }
@@ -777,7 +846,11 @@ class GmService {
       } as IStoredPlayer);
 
     let beforeValue: number | undefined;
-    if (request.kind === "economy_deposit" || request.kind === "economy_withdraw") {
+    if (
+      request.kind === "economy_deposit" ||
+      request.kind === "economy_withdraw" ||
+      request.kind === "economy_set"
+    ) {
       const currentBalances = await this.queryBalances(request.instanceId, request.playerUuid);
       beforeValue = currentBalances.economyBalance;
     }
@@ -804,12 +877,17 @@ class GmService {
     if (
       request.kind === "economy_deposit" ||
       request.kind === "economy_withdraw" ||
+      request.kind === "economy_set" ||
       request.kind === "points_give" ||
       request.kind === "points_take"
     ) {
       if (success) {
         result.balances = await this.queryBalances(request.instanceId, request.playerUuid);
-        if (request.kind === "economy_deposit" || request.kind === "economy_withdraw") {
+        if (
+          request.kind === "economy_deposit" ||
+          request.kind === "economy_withdraw" ||
+          request.kind === "economy_set"
+        ) {
           result.afterValue = result.balances.economyBalance;
         }
         if (request.kind === "points_give" || request.kind === "points_take") {

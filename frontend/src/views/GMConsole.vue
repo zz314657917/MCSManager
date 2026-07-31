@@ -16,6 +16,7 @@ import {
   TeamOutlined,
   ReloadOutlined
 } from "@ant-design/icons-vue";
+import { Segmented as ASegmented } from "ant-design-vue";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -58,13 +59,15 @@ const {
   isChatLoading,
   isDetailLoading,
   isExecutingAction,
+  isSendingChat,
   latestError,
   selectedServerKey,
   selectedPlayerUuid,
   selectServer,
   selectPlayer,
   refreshCurrent,
-  executeAction
+  executeAction,
+  sendChat
 } = gmState;
 
 const isChatPage = computed(() => route.path === "/gm/chat");
@@ -123,6 +126,27 @@ const chatTimelineMeta = computed(() => {
   const playerLabel = currentPlayer.value?.playerName || "未选择玩家";
   return `所有实例汇总 / 当前操作玩家 ${playerLabel}`;
 });
+const chatMessage = ref("");
+const chatTarget = ref<IMcsmGmChatSendRequest["target"]>("broadcast");
+const chatTargetOptions = computed(() => [
+  { label: "全服", value: "broadcast" },
+  {
+    label: currentPlayer.value?.online ? `私聊 ${currentPlayer.value.playerName}` : "私聊",
+    value: "private",
+    disabled: !currentPlayer.value?.online
+  }
+]);
+const canSendChat = computed(
+  () =>
+    Boolean(currentServer.value?.daemonAvailable) &&
+    Boolean(chatMessage.value.trim()) &&
+    (chatTarget.value === "broadcast" || Boolean(currentPlayer.value?.online))
+);
+const chatRecipientText = computed(() =>
+  chatTarget.value === "private" && currentPlayer.value?.online
+    ? `发送给 ${currentPlayer.value.playerName}`
+    : `发送到 ${currentServer.value?.instanceDisplayName || "当前实例"}`
+);
 
 const resolveMessageSource = (message: IMcsmGmChatMessage) =>
   serverLabelMap.value[createGmServerKey(message.daemonId, message.instanceId)] ||
@@ -148,6 +172,16 @@ const openManagePage = () => {
   router.push("/gm");
 };
 
+const handleSendChat = async () => {
+  const sent = await sendChat({
+    target: chatTarget.value,
+    message: chatMessage.value
+  });
+  if (sent) {
+    chatMessage.value = "";
+  }
+};
+
 watch(
   () => messages.value.length,
   async () => {
@@ -163,6 +197,15 @@ watch(
   (phone) => {
     if (!phone) {
       operationsDrawerOpen.value = false;
+    }
+  }
+);
+
+watch(
+  () => currentPlayer.value?.online,
+  (online) => {
+    if (!online && chatTarget.value === "private") {
+      chatTarget.value = "broadcast";
     }
   }
 );
@@ -379,6 +422,41 @@ watch(
                 <a-empty v-else :image="false" description="当前还没有聊天记录。" />
               </div>
             </a-spin>
+
+            <div class="gm-console__chat-composer">
+              <div class="gm-console__chat-composer-controls">
+                <ASegmented
+                  v-model:value="chatTarget"
+                  size="small"
+                  :options="chatTargetOptions"
+                  data-testid="gm-chat-target"
+                />
+                <span class="gm-console__chat-recipient">{{ chatRecipientText }}</span>
+              </div>
+              <a-textarea
+                v-model:value="chatMessage"
+                class="gm-console__chat-input"
+                :auto-size="{ minRows: 1, maxRows: 3 }"
+                :maxlength="500"
+                placeholder="输入消息"
+                :disabled="!currentServer?.daemonAvailable"
+                data-testid="gm-chat-input"
+                @keydown.ctrl.enter.prevent="handleSendChat"
+              />
+              <a-button
+                type="primary"
+                class="gm-console__chat-send"
+                :loading="isSendingChat"
+                :disabled="!canSendChat"
+                data-testid="gm-chat-send"
+                @click="handleSendChat"
+              >
+                <template #icon>
+                  <MessageOutlined />
+                </template>
+                <span>发送</span>
+              </a-button>
+            </div>
           </section>
         </div>
 
@@ -659,7 +737,7 @@ watch(
 
 .gm-console__chat-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
@@ -669,6 +747,9 @@ watch(
 .gm-console__chat-panel :deep(.ant-spin) {
   width: 100%;
   max-width: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .gm-console__chat-panel :deep(.ant-spin-nested-loading),
@@ -711,6 +792,42 @@ watch(
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.gm-console__chat-composer {
+  display: grid;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 18px;
+  border-top: 1px solid var(--design-hairline-soft);
+  background: var(--design-surface-card);
+}
+
+.gm-console__chat-composer-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gm-console__chat-recipient {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--design-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-console__chat-input {
+  min-width: 0;
+  resize: none;
+}
+
+.gm-console__chat-send {
+  flex: 0 0 auto;
 }
 
 .gm-console__chat-body {
@@ -834,6 +951,15 @@ watch(
   .gm-console__summary-tags,
   .gm-console__chat-toolbar-actions {
     justify-content: flex-start;
+  }
+
+  .gm-console__chat-composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 12px;
+  }
+
+  .gm-console__chat-composer-controls {
+    grid-column: 1 / -1;
   }
 
   .gm-console__summary-title {

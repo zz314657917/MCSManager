@@ -7,6 +7,7 @@ import {
   createEconomyServerKey,
   type EconomyRankingRangeKey,
   type EconomyTimeRangeKey,
+  type EconomyWriteActionPayload,
   useEconomyConsoleState
 } from "@/hooks/useEconomyConsoleState";
 import { useEconomyConsolePreviewState } from "@/hooks/useEconomyConsolePreviewState";
@@ -17,17 +18,22 @@ import {
   BarChartOutlined,
   CloudServerOutlined,
   DollarCircleOutlined,
+  EditOutlined,
   RiseOutlined,
   ReloadOutlined,
   SwapOutlined,
   WalletOutlined
 } from "@ant-design/icons-vue";
-import { Segmented as ASegmented } from "ant-design-vue";
+import { Modal, Segmented as ASegmented } from "ant-design-vue";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 
 type EconomyMetricTone = "in" | "out" | "net" | "count" | "delay";
 type EconomyTrendSeriesKey = "systemIn" | "systemOut";
+type EconomyActionKind = EconomyWriteActionPayload["kind"];
+type EconomyActionTarget = Pick<EconomyWriteActionPayload, "daemonId" | "instanceId" | "playerUuid"> & {
+  playerName?: string;
+};
 
 const TREND_CHART_WIDTH = 760;
 const TREND_CHART_HEIGHT = 280;
@@ -93,13 +99,20 @@ const {
   isRefreshing,
   isTransactionLoading,
   isRankingLoading,
+  isExecutingAction,
   latestError,
   selectServer,
   selectCurrency,
   setTimeRange,
   setRankingRange,
-  refreshCurrent
+  refreshCurrent,
+  executeEconomyAction
 } = economyState;
+
+const economyActionOpen = ref(false);
+const economyActionTarget = ref<EconomyActionTarget>();
+const economyActionKind = ref<EconomyActionKind>("economy_deposit");
+const economyActionAmount = ref<number | undefined>(1000);
 
 const serverOptions = computed(() =>
   [
@@ -142,6 +155,33 @@ const maxSourceAmount = computed(() => Math.max(...sources.value.map((item) => i
 const isAllServersSelected = computed(
   () => !selectedServerKey.value || selectedServerKey.value === ECONOMY_ALL_SERVERS_KEY
 );
+const canWriteDefaultCurrency = computed(() => currentCurrency.value.type === "money");
+const economyActionTitle = computed(() => {
+  if (economyActionKind.value === "economy_withdraw") return "扣除余额";
+  if (economyActionKind.value === "economy_set") return "设置余额";
+  return "增加余额";
+});
+const economyActionVerb = computed(() => {
+  if (economyActionKind.value === "economy_withdraw") return "扣除";
+  if (economyActionKind.value === "economy_set") return "设置为";
+  return "增加";
+});
+const economyActionTargetLabel = computed(() => {
+  const target = economyActionTarget.value;
+  if (!target) return "--";
+  return `${target.playerName || target.playerUuid} / ${getServerLabel(target.daemonId, target.instanceId)}`;
+});
+const isEconomyActionReady = computed(() => {
+  const amount = Number(economyActionAmount.value);
+  return (
+    Boolean(economyActionTarget.value) &&
+    Number.isFinite(amount) &&
+    amount >= 0 &&
+    (economyActionKind.value === "economy_set" || amount > 0) &&
+    canWriteDefaultCurrency.value &&
+    !isExecutingAction.value
+  );
+});
 
 const currentStatusText = computed(() => {
   if (isAllServersSelected.value) return `${summary.value.serversAvailable}/${summary.value.serversTotal} 区可用`;
@@ -185,7 +225,7 @@ const scopeDelayText = computed(() =>
 );
 
 const pageEyebrow = computed(() =>
-  isLocalPreviewMode ? "本地预览 / PlayerCurrency / 审计只读" : "PlayerCurrency / 审计只读"
+  isLocalPreviewMode ? "本地预览 / PlayerCurrency / 管理员审计调整" : "PlayerCurrency / 管理员审计调整"
 );
 
 const summaryMetrics = computed<Array<{ label: string; value: string; sub: string; tone: EconomyMetricTone }>>(() => [
@@ -343,6 +383,12 @@ const transactionColumns = [
     title: "原因",
     dataIndex: "operatorReason",
     key: "operatorReason"
+  },
+  {
+    title: "操作",
+    key: "action",
+    width: 90,
+    fixed: "right" as const
   }
 ];
 
@@ -471,6 +517,57 @@ function onRangeChange(value: string | number) {
   if (value === "today" || value === "24h" || value === "7d") {
     setTimeRange(value);
   }
+}
+
+function isEconomyTargetAvailable(daemonId: string, instanceId: string) {
+  const server = servers.value.find((item) => item.daemonId === daemonId && item.instanceId === instanceId);
+  return Boolean(server?.daemonAvailable && server.pluginAvailable && canWriteDefaultCurrency.value);
+}
+
+function openEconomyAction(target: EconomyActionTarget) {
+  if (!isEconomyTargetAvailable(target.daemonId, target.instanceId)) return;
+  economyActionTarget.value = target;
+  economyActionKind.value = "economy_deposit";
+  economyActionAmount.value = 1000;
+  economyActionOpen.value = true;
+}
+
+async function submitEconomyAction() {
+  const target = economyActionTarget.value;
+  const amount = Number(economyActionAmount.value);
+  if (!target || !Number.isFinite(amount)) return false;
+  const success = await executeEconomyAction({
+    kind: economyActionKind.value,
+    daemonId: target.daemonId,
+    instanceId: target.instanceId,
+    playerUuid: target.playerUuid,
+    currencyType: currentCurrency.value.type,
+    amount
+  });
+  if (success) {
+    economyActionOpen.value = false;
+  }
+  return success;
+}
+
+function requestEconomyAction() {
+  const amount = Number(economyActionAmount.value);
+  const target = economyActionTarget.value;
+  if (!target || !Number.isFinite(amount)) return;
+  economyActionOpen.value = false;
+  Modal.confirm({
+    title: `确认${economyActionTitle.value}`,
+    content: `将对 ${economyActionTargetLabel.value} ${economyActionVerb.value} ${formatCurrencyAmount(amount)} ${currentCurrency.value.name}。`,
+    okText: "确认执行",
+    cancelText: "取消",
+    okButtonProps: economyActionKind.value === "economy_deposit" ? undefined : { danger: true },
+    async onOk() {
+      const success = await submitEconomyAction();
+      if (!success) {
+        throw new Error("经济操作执行失败。");
+      }
+    }
+  });
 }
 
 function openControlPage() {
@@ -808,6 +905,24 @@ function openGmPage() {
                     <div class="economy-console__ranking-player">
                       <strong>{{ row.playerName || "未知玩家" }}</strong>
                       <span>{{ row.serverName || row.playerUuid }}</span>
+                      <a-button
+                        type="link"
+                        size="small"
+                        class="economy-console__player-action"
+                        :disabled="!isEconomyTargetAvailable(row.daemonId, row.instanceId)"
+                        :data-testid="`economy-ranking-action-${row.playerUuid}`"
+                        @click="
+                          openEconomyAction({
+                            daemonId: row.daemonId,
+                            instanceId: row.instanceId,
+                            playerUuid: row.playerUuid,
+                            playerName: row.playerName
+                          })
+                        "
+                      >
+                        <template #icon><EditOutlined /></template>
+                        操作
+                      </a-button>
                     </div>
                     <div class="economy-console__ranking-amount">
                       <strong>{{ formatCurrencyAmount(row.amount) }}</strong>
@@ -853,7 +968,7 @@ function openGmPage() {
                 :columns="transactionColumns"
                 :data-source="transactions"
                 :pagination="{ pageSize: 20, showSizeChanger: false }"
-                :scroll="{ x: 1280, y: 420 }"
+                :scroll="{ x: 1380, y: 420 }"
               >
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'occurredAt'">
@@ -893,6 +1008,24 @@ function openGmPage() {
                   <template v-else-if="column.key === 'operatorReason'">
                     <span class="economy-console__reason">{{ record.operatorReason || "--" }}</span>
                   </template>
+                  <template v-else-if="column.key === 'action'">
+                    <a-button
+                      type="link"
+                      size="small"
+                      :disabled="!isEconomyTargetAvailable(record.daemonId, record.instanceId)"
+                      :data-testid="`economy-transaction-action-${record.id}`"
+                      @click="
+                        openEconomyAction({
+                          daemonId: record.daemonId,
+                          instanceId: record.instanceId,
+                          playerUuid: record.playerUuid,
+                          playerName: record.playerName
+                        })
+                      "
+                    >
+                      操作
+                    </a-button>
+                  </template>
                 </template>
               </a-table>
             </template>
@@ -924,6 +1057,23 @@ function openGmPage() {
                   <span>余额 {{ formatCurrencyAmount(transaction.balanceAfter) }}</span>
                 </div>
                 <p>{{ transaction.operatorReason || "无操作原因" }}</p>
+                <a-button
+                  size="small"
+                  class="economy-console__mobile-player-action"
+                  :disabled="!isEconomyTargetAvailable(transaction.daemonId, transaction.instanceId)"
+                  :data-testid="`economy-transaction-action-${transaction.id}`"
+                  @click="
+                    openEconomyAction({
+                      daemonId: transaction.daemonId,
+                      instanceId: transaction.instanceId,
+                      playerUuid: transaction.playerUuid,
+                      playerName: transaction.playerName
+                    })
+                  "
+                >
+                  <template #icon><EditOutlined /></template>
+                  操作余额
+                </a-button>
               </article>
               <a-empty v-if="!transactions.length" :image="false" description="当前没有流水。" />
             </div>
@@ -931,6 +1081,41 @@ function openGmPage() {
         </section>
       </div>
     </OperationsPageShell>
+
+    <a-modal
+      v-model:open="economyActionOpen"
+      :title="economyActionTitle"
+      :confirm-loading="isExecutingAction"
+      :ok-button-props="{ disabled: !isEconomyActionReady }"
+      ok-text="下一步"
+      cancel-text="取消"
+      data-testid="economy-action-modal"
+      @ok="requestEconomyAction"
+    >
+      <div class="economy-console__action-target">
+        <span>目标玩家</span>
+        <strong>{{ economyActionTargetLabel }}</strong>
+      </div>
+      <a-segmented
+        v-model:value="economyActionKind"
+        class="economy-console__action-kind"
+        :options="[
+          { label: '增加', value: 'economy_deposit' },
+          { label: '扣除', value: 'economy_withdraw' },
+          { label: '设置', value: 'economy_set' }
+        ]"
+        data-testid="economy-action-kind"
+      />
+      <a-input-number
+        v-model:value="economyActionAmount"
+        class="economy-console__action-amount"
+        :min="0"
+        :precision="0"
+        :addon-after="currentCurrency.name"
+        placeholder="输入余额数值"
+        data-testid="economy-action-amount"
+      />
+    </a-modal>
 
     <OperationsMobileNav
       v-if="shellRef?.isPhone && OPERATIONS_MOBILE_NAV_ITEMS.length"
@@ -1497,6 +1682,13 @@ function openGmPage() {
   min-width: 0;
 }
 
+.economy-console__player-action {
+  align-self: flex-start;
+  width: fit-content;
+  margin: 2px -8px -4px;
+  padding-inline: 8px;
+}
+
 .economy-console__ranking-player strong,
 .economy-console__ranking-amount strong {
   overflow: hidden;
@@ -1645,6 +1837,43 @@ function openGmPage() {
 .economy-console__mobile-transaction p {
   margin: 10px 0 0;
   overflow-wrap: anywhere;
+}
+
+.economy-console__mobile-player-action {
+  margin-top: 10px;
+}
+
+.economy-console__action-target {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--design-hairline-soft);
+  border-radius: 12px;
+  background: var(--design-canvas-soft);
+}
+
+.economy-console__action-target span {
+  color: var(--design-muted);
+  font-size: 12px;
+}
+
+.economy-console__action-target strong {
+  overflow: hidden;
+  color: var(--design-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.economy-console__action-kind,
+.economy-console__action-amount {
+  width: 100%;
+}
+
+.economy-console__action-amount {
+  margin-top: 14px;
 }
 
 .economy-console__mobile-nav {

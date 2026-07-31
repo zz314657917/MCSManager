@@ -579,6 +579,7 @@ export function useGmConsolePreviewState() {
   const isChatLoading = ref(false);
   const isDetailLoading = ref(false);
   const isExecutingAction = ref(false);
+  const isSendingChat = ref(false);
   const latestError = ref("");
 
   const selectedServerKey = ref(
@@ -804,7 +805,9 @@ export function useGmConsolePreviewState() {
       };
 
       if (
-        (payload.kind === "economy_deposit" || payload.kind === "economy_withdraw") &&
+        (payload.kind === "economy_deposit" ||
+          payload.kind === "economy_withdraw" ||
+          payload.kind === "economy_set") &&
         !record.balances.economyAvailable
       ) {
         return fail("当前实例未启用经济系统。");
@@ -826,18 +829,26 @@ export function useGmConsolePreviewState() {
       let beforeValue: number | undefined;
       let afterValue: number | undefined;
 
-      if (payload.kind === "economy_deposit" || payload.kind === "economy_withdraw") {
+      if (
+        payload.kind === "economy_deposit" ||
+        payload.kind === "economy_withdraw" ||
+        payload.kind === "economy_set"
+      ) {
         beforeValue = record.balances.economyBalance || 0;
         afterValue =
           payload.kind === "economy_deposit"
             ? beforeValue + payload.amount
-            : Math.max(0, beforeValue - payload.amount);
+            : payload.kind === "economy_withdraw"
+              ? Math.max(0, beforeValue - payload.amount)
+              : payload.amount;
         record.balances.economyBalance = afterValue;
         record.balances.updatedAt = new Date().toISOString();
         message =
           payload.kind === "economy_deposit"
             ? `已给 ${player.playerName} 增加 ${payload.amount} 金币。`
-            : `已从 ${player.playerName} 扣除 ${payload.amount} 金币。`;
+            : payload.kind === "economy_withdraw"
+              ? `已从 ${player.playerName} 扣除 ${payload.amount} 金币。`
+              : `已将 ${player.playerName} 的金币设为 ${payload.amount}。`;
         appendMessage(serverKey, {
           senderType: "gm",
           text: message
@@ -1031,6 +1042,51 @@ export function useGmConsolePreviewState() {
     }
   };
 
+  const sendChat = async (payload: Pick<IMcsmGmChatSendRequest, "target" | "message">) => {
+    const server = currentServer.value;
+    const serverKey = selectedServerKey.value;
+    const message = payload.message.trim();
+    if (!server || !serverKey) {
+      latestError.value = "请先选择一个实例。";
+      return false;
+    }
+    if (!server.daemonAvailable) {
+      latestError.value = "节点离线，无法发送聊天消息。";
+      return false;
+    }
+    if (!message) {
+      latestError.value = "请输入聊天内容。";
+      return false;
+    }
+    if (message.length > 500) {
+      latestError.value = "消息不能超过 500 个字符。";
+      return false;
+    }
+
+    const player = currentPlayer.value;
+    if (payload.target === "private" && (!player || !player.online)) {
+      latestError.value = "请选择当前实例中的在线玩家后再私聊。";
+      return false;
+    }
+
+    isSendingChat.value = true;
+    latestError.value = "";
+    try {
+      await delay(120);
+      appendMessage(serverKey, {
+        senderType: "gm",
+        playerName: PREVIEW_OPERATOR,
+        channel: payload.target,
+        tellPlayerName: payload.target === "private" ? player?.playerName : undefined,
+        source: "panel",
+        text: message
+      });
+      return true;
+    } finally {
+      isSendingChat.value = false;
+    }
+  };
+
   watch(
     selectedServerKey,
     () => {
@@ -1071,10 +1127,12 @@ export function useGmConsolePreviewState() {
     isChatLoading,
     isDetailLoading,
     isExecutingAction,
+    isSendingChat,
     latestError,
     selectServer,
     selectPlayer,
     refreshCurrent,
-    executeAction
+    executeAction,
+    sendChat
   };
 }

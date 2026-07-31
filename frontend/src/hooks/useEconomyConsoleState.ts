@@ -1,7 +1,8 @@
 import {
   economyCurrenciesApi,
   economyOverviewApi,
-  economyTransactionsApi
+  economyTransactionsApi,
+  gmExecuteActionApi
 } from "@/services/apis";
 import { useDocumentVisibility } from "@/hooks/useDocumentVisibility";
 import { reportErrorMsg } from "@/tools/validator";
@@ -22,11 +23,22 @@ export interface EconomyRankingRow {
   rank: number;
   previousRank?: number;
   rankDelta: number;
+  daemonId: string;
+  instanceId: string;
   playerUuid: string;
   playerName?: string;
   serverName?: string;
   amount: number;
 }
+
+export type EconomyWriteActionPayload = {
+  kind: "economy_deposit" | "economy_withdraw" | "economy_set";
+  daemonId: string;
+  instanceId: string;
+  playerUuid: string;
+  currencyType: string;
+  amount: number;
+};
 
 export const getEconomyTimeRange = (rangeKey: EconomyTimeRangeKey) => {
   const now = new Date();
@@ -98,6 +110,8 @@ const latestBalancesByPlayer = (
     map.set(key, {
       rank: 0,
       rankDelta: 0,
+      daemonId: transaction.daemonId,
+      instanceId: transaction.instanceId,
       playerUuid: transaction.playerUuid,
       playerName: transaction.playerName,
       serverName: resolveServerName?.(transaction) || transaction.instanceId,
@@ -129,6 +143,8 @@ export const buildEconomyRankingRows = (
       rank,
       previousRank,
       rankDelta: previousRank ? previousRank - rank : 0,
+      daemonId: value.daemonId,
+      instanceId: value.instanceId,
       playerUuid: value.playerUuid,
       playerName: value.playerName,
       serverName: value.serverName,
@@ -262,6 +278,7 @@ export function useEconomyConsoleState() {
   const rankingTransactionsRequest = economyTransactionsApi();
   const previousRankingTransactionsRequest = economyTransactionsApi();
   const currenciesRequest = economyCurrenciesApi();
+  const executeActionRequest = gmExecuteActionApi();
 
   const overview = ref<IMcsmEconomyOverviewResponse>();
   const servers = ref<IMcsmEconomyOverviewServer[]>([]);
@@ -277,6 +294,7 @@ export function useEconomyConsoleState() {
   const isRefreshing = ref(false);
   const isTransactionLoading = ref(false);
   const isRankingLoading = ref(false);
+  const isExecutingAction = ref(false);
   const latestError = ref("");
 
   let pollTimer: number | undefined;
@@ -553,6 +571,61 @@ export function useEconomyConsoleState() {
     }
   };
 
+  const executeEconomyAction = async (payload: EconomyWriteActionPayload) => {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount < 0 || (payload.kind !== "economy_set" && amount <= 0)) {
+      setError(new Error("请输入有效的余额数值。"), "请输入有效的余额数值。", true);
+      return false;
+    }
+    if (payload.currencyType !== "money") {
+      setError(
+        new Error("当前仅支持默认 money 货币的余额操作。"),
+        "当前仅支持默认 money 货币的余额操作。",
+        true
+      );
+      return false;
+    }
+
+    const server = servers.value.find(
+      (item) => item.daemonId === payload.daemonId && item.instanceId === payload.instanceId
+    );
+    if (!server || !server.daemonAvailable || !server.pluginAvailable) {
+      setError(new Error("目标实例当前不可操作。"), "目标实例当前不可操作。", true);
+      return false;
+    }
+
+    isExecutingAction.value = true;
+    latestError.value = "";
+    try {
+      const response = await executeActionRequest.execute({
+        data: {
+          kind: payload.kind,
+          daemonId: payload.daemonId,
+          instanceId: payload.instanceId,
+          playerUuid: payload.playerUuid,
+          amount
+        }
+      });
+      const result = response.value;
+      if (!result) {
+        throw new Error("经济操作返回了空响应。");
+      }
+      if (!result.success) {
+        setError(new Error(result.message), result.message, true);
+        return false;
+      }
+
+      await refreshCurrent(true);
+      latestError.value = "";
+      return true;
+    } catch (error) {
+      setError(error, "经济操作执行失败。", true);
+      return false;
+    } finally {
+      isExecutingAction.value = false;
+    }
+  };
+
   const selectServer = (serverKey: string) => {
     if (serverKey === selectedServerKey.value) return;
     selectedServerKey.value = serverKey || ECONOMY_ALL_SERVERS_KEY;
@@ -648,11 +721,13 @@ export function useEconomyConsoleState() {
     isRefreshing,
     isTransactionLoading,
     isRankingLoading,
+    isExecutingAction,
     latestError,
     selectServer,
     selectCurrency,
     setTimeRange,
     setRankingRange,
-    refreshCurrent
+    refreshCurrent,
+    executeEconomyAction
   };
 }

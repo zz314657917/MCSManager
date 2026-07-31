@@ -34,6 +34,14 @@ routerApp.on("gm/chat", async (ctx, data) => {
   }
 });
 
+routerApp.on("gm/chat/send", async (ctx, data) => {
+  try {
+    protocol.response(ctx, await gmService.sendChat(data as IMcsmGmChatSendRequest));
+  } catch (error: any) {
+    protocol.responseError(ctx, error);
+  }
+});
+
 routerApp.on("gm/balances", async (ctx, data) => {
   try {
     protocol.response(

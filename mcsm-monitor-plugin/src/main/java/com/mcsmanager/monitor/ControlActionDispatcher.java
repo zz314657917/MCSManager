@@ -55,6 +55,9 @@ final class ControlActionDispatcher {
         if ("inventory".equalsIgnoreCase(action)) {
             return handleInventory(request);
         }
+        if ("chat".equalsIgnoreCase(action)) {
+            return handleChat(request);
+        }
         return ActionResult.error(400, "Unsupported action: " + action);
     }
 
@@ -111,6 +114,37 @@ final class ControlActionDispatcher {
             return ActionResult.error(409, "Player must be online.");
         }
         return plugin.getInventorySnapshotAdapter().snapshot(player);
+    }
+
+    private ActionResult handleChat(Map<String, Object> request) {
+        String operation = readString(request, "operation");
+        String message = readString(request, "message");
+        if (message.isEmpty()) {
+            return ActionResult.error(400, "message is required.");
+        }
+        if (message.length() > 500) {
+            return ActionResult.error(400, "message must not exceed 500 characters.");
+        }
+
+        String decoratedMessage = "[GM] " + message;
+        LinkedHashMap<String, Object> data = new LinkedHashMap<String, Object>();
+        if ("broadcast".equalsIgnoreCase(operation)) {
+            Bukkit.broadcastMessage(decoratedMessage);
+            data.put("target", "broadcast");
+            return ActionResult.success("Broadcast message delivered.", data);
+        }
+        if ("private".equalsIgnoreCase(operation)) {
+            Player player = resolveOnlinePlayer(request);
+            if (player == null) {
+                return ActionResult.error(409, "Player must be online to receive a private message.");
+            }
+            player.sendMessage(decoratedMessage);
+            data.put("target", "private");
+            data.put("playerUuid", player.getUniqueId().toString());
+            data.put("playerName", player.getName());
+            return ActionResult.success("Private message delivered.", data);
+        }
+        return ActionResult.error(400, "Unsupported chat operation: " + operation);
     }
 
     private OfflinePlayer resolvePlayer(Map<String, Object> request, boolean allowOffline) {

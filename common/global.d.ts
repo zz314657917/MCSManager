@@ -439,6 +439,7 @@ declare global {
   type IMcsmGmActionKind =
     | "economy_deposit"
     | "economy_withdraw"
+    | "economy_set"
     | "points_give"
     | "points_take"
     | "lp_group_add"
@@ -451,7 +452,9 @@ declare global {
     | "lp_temp_permission_set"
     | "lp_temp_permission_unset"
     | "chat_mute"
-    | "chat_unmute";
+    | "chat_unmute"
+    | "chat_broadcast"
+    | "chat_private";
 
   interface IMcsmGmControllerInfo {
     host: string;
@@ -562,6 +565,25 @@ declare global {
     time: string;
   }
 
+  interface IMcsmGmChatSendRequest {
+    daemonId: string;
+    instanceId: string;
+    target: "broadcast" | "private";
+    message: string;
+    playerUuid?: string;
+  }
+
+  interface IMcsmGmChatSendResult {
+    success: boolean;
+    daemonId: string;
+    instanceId: string;
+    target: "broadcast" | "private";
+    playerUuid?: string;
+    playerName?: string;
+    message: string;
+    updatedAt: string;
+  }
+
   interface IMcsmGmDependencySnapshot {
     economyAvailable: boolean;
     pointsAvailable: boolean;
@@ -601,7 +623,7 @@ declare global {
 
   type IMcsmGmActionRequest =
     | {
-        kind: "economy_deposit" | "economy_withdraw";
+        kind: "economy_deposit" | "economy_withdraw" | "economy_set";
         daemonId: string;
         instanceId: string;
         playerUuid: string;

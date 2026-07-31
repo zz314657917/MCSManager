@@ -3,6 +3,7 @@ import {
   createEconomyServerKey,
   type EconomyRankingRangeKey,
   type EconomyTimeRangeKey,
+  type EconomyWriteActionPayload,
   buildEconomyRankingRows,
   getEconomyRankingTimeRange,
   getEconomyTimeRange
@@ -938,6 +939,7 @@ export function useEconomyConsolePreviewState() {
   const isRefreshing = ref(false);
   const isTransactionLoading = ref(false);
   const isRankingLoading = ref(false);
+  const isExecutingAction = ref(false);
   const latestError = ref("");
 
   const servers = computed(() => records.value.map((item) => item.server));
@@ -1060,6 +1062,76 @@ export function useEconomyConsolePreviewState() {
     }
   };
 
+  const executeEconomyAction = async (payload: EconomyWriteActionPayload) => {
+    const amount = Number(payload.amount);
+    if (!Number.isFinite(amount) || amount < 0 || (payload.kind !== "economy_set" && amount <= 0)) {
+      latestError.value = "请输入有效的余额数值。";
+      return false;
+    }
+    if (payload.currencyType !== "money") {
+      latestError.value = "当前仅支持默认 money 货币的余额操作。";
+      return false;
+    }
+
+    const record = records.value.find(
+      (item) => item.server.daemonId === payload.daemonId && item.server.instanceId === payload.instanceId
+    );
+    if (!record || !record.server.daemonAvailable || !record.server.pluginAvailable) {
+      latestError.value = "目标实例当前不可操作。";
+      return false;
+    }
+
+    isExecutingAction.value = true;
+    latestError.value = "";
+    try {
+      await delay(120);
+      const latestTransaction = record.transactions
+        .filter((item) => item.playerUuid === payload.playerUuid && item.currencyType === "money")
+        .slice()
+        .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
+      const beforeValue = latestTransaction?.balanceAfter || 0;
+      const balanceAfter =
+        payload.kind === "economy_deposit"
+          ? beforeValue + amount
+          : payload.kind === "economy_withdraw"
+            ? Math.max(0, beforeValue - amount)
+            : amount;
+      const delta = balanceAfter - beforeValue;
+      const transaction = createPreviewTransaction(record.server, Date.now(), {
+        playerUuid: payload.playerUuid,
+        playerName: latestTransaction?.playerName || "未知玩家",
+        currencyType: "money",
+        currencyName: "落叶币",
+        delta,
+        balanceAfter,
+        operatorName: "local-preview-admin",
+        operatorReason:
+          payload.kind === "economy_deposit"
+            ? "GM 增加余额"
+            : payload.kind === "economy_withdraw"
+              ? "GM 扣除余额"
+              : "GM 设置余额",
+        category: "ADMIN_ADJUST",
+        source: "GMConsole",
+        occurredAt: new Date().toISOString()
+      });
+      record.transactions.push(transaction);
+      if (record.rankingTransactions) {
+        record.rankingTransactions.push(transaction);
+      }
+
+      const currency = record.server.currencies.find((item) => item.type === "money");
+      if (currency) {
+        currency.totalBalance += delta;
+        currency.updatedAt = transaction.occurredAt;
+      }
+      applyServerStats(record.server, record.transactions);
+      return true;
+    } finally {
+      isExecutingAction.value = false;
+    }
+  };
+
   return {
     stateSource: "preview" as const,
     overview,
@@ -1080,11 +1152,13 @@ export function useEconomyConsolePreviewState() {
     isRefreshing,
     isTransactionLoading,
     isRankingLoading,
+    isExecutingAction,
     latestError,
     selectServer,
     selectCurrency,
     setTimeRange,
     setRankingRange,
-    refreshCurrent
+    refreshCurrent,
+    executeEconomyAction
   };
 }

@@ -325,6 +325,16 @@ export const gmExecuteActionApi = useDefineApi<
   method: "POST"
 });
 
+export const gmChatSendApi = useDefineApi<
+  {
+    data: IMcsmGmChatSendRequest;
+  },
+  IMcsmGmChatSendResult
+>({
+  url: "/api/gm/chat/send",
+  method: "POST"
+});
+
 export const gmAuditApi = useDefineApi<
   {
     params: {
