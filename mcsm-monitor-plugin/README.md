@@ -1,6 +1,8 @@
 # MCSM Monitor Plugin
 
-适用于 `Spigot 1.12.2 / Java 8` 的轻量监控插件。
+适用于 `Spigot / Paper / Arclight 1.20.1 / Java 17` 的轻量监控插件。
+
+当前构建基线为 Spigot `1.20.1-R0.1-SNAPSHOT`，产物仅作为 1.20.1 服务端版本使用；原有 1.12.2 / Java 8 环境不再是本模块的已验证支持范围。
 
 当前版本除了基础 heartbeat 之外，还补了 GM 管理页一期需要的插件侧能力：
 

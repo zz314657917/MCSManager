@@ -2,6 +2,8 @@ package com.mcsmanager.monitor;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -97,7 +99,7 @@ final class PlayerSnapshotReporter {
             item.put("world", player.getWorld().getName());
             item.put("gameMode", player.getGameMode().name());
             item.put("health", Double.valueOf(player.getHealth()));
-            item.put("maxHealth", Double.valueOf(player.getMaxHealth()));
+            item.put("maxHealth", Double.valueOf(readMaxHealth(player)));
             item.put("foodLevel", Integer.valueOf(player.getFoodLevel()));
             item.put("level", Integer.valueOf(player.getLevel()));
             item.put("exp", Float.valueOf(player.getExp()));
@@ -128,5 +130,10 @@ final class PlayerSnapshotReporter {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private double readMaxHealth(Player player) {
+        AttributeInstance maxHealth = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        return maxHealth == null ? player.getHealth() : maxHealth.getValue();
     }
 }

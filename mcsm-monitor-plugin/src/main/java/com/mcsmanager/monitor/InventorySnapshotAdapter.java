@@ -1,12 +1,14 @@
 package com.mcsmanager.monitor;
 
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.Damageable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,13 +78,13 @@ final class InventorySnapshotAdapter {
         data.put("rawTypeName", material.name());
         data.put("amount", Integer.valueOf(item.getAmount()));
 
+        ItemMeta meta = item.hasItemMeta() ? item.getItemMeta() : null;
         int maxDurability = material.getMaxDurability();
         if (maxDurability > 0) {
-            data.put("durability", Integer.valueOf(item.getDurability()));
+            data.put("durability", Integer.valueOf(readDamage(meta)));
             data.put("maxDurability", Integer.valueOf(maxDurability));
         }
 
-        ItemMeta meta = item.hasItemMeta() ? item.getItemMeta() : null;
         if (meta != null) {
             if (meta.hasDisplayName()) {
                 data.put("displayName", meta.getDisplayName());
@@ -131,7 +133,11 @@ final class InventorySnapshotAdapter {
         if (enchantment == null) {
             return "UNKNOWN";
         }
-        String name = enchantment.getName();
-        return name == null || name.trim().isEmpty() ? enchantment.toString() : name.trim();
+        NamespacedKey key = enchantment.getKey();
+        return key == null ? enchantment.toString() : key.toString();
+    }
+
+    private int readDamage(ItemMeta meta) {
+        return meta instanceof Damageable ? ((Damageable) meta).getDamage() : 0;
     }
 }
