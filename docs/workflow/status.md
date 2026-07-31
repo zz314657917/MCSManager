@@ -1,22 +1,23 @@
 ---
 phase: done
-current_sprint: 1
-total_sprints: 4
-pending_action: prepare-sprint-02-contract
+current_sprint: gm-chat-economy-write-operations
+total_sprints: 1
+pending_action: panel-daemon-admin-and-403-smoke-before-deployment
 project_type: mcsm-web-plugin
-qa_mode: browser
-approval_required: true
-last_verified: 2026-06-27
+qa_mode: browser-plugin
+approval_required: false
+last_verified: 2026-07-31
 ---
 
 # Workflow Status
 
 - 当前阶段：`done`
-- 本轮默认收口主题：`operations-console-ux-hardening`
-- 当前 Sprint：`ux-sprint-01-control-target-danger`
-- 当前 spec：`docs/workflow/spec-operations-console-ux-hardening.md`
-- 当前 contract：`docs/workflow/tasks/sprint-01-control-target-danger-contract.md`
-- 下一合法动作：如继续本主题，进入 Sprint 2 contract 草拟：终端日志过滤、暂停滚动、清屏/复制和健康摘要收敛。
-- Sprint 1 验收结论：目标卡片玩家人数展示、危险操作分层、单实例/批量危险确认均已完成；`type-check`、`build-only`、相关 Vitest、Playwright 控制台预览用例通过。
-- 最近完成记录：上一轮 `operations-routing-and-daemon-hardening` 已收口到 operations 页面恢复、`process config` 编辑修复、7zip 特殊字符解压修复，以及上游 `MCSManager v10.16.2` 合流后的本地同步。
-- 状态推进规则：先 `spec-approved`，再进入当前 Sprint 的 `contract-draft -> contract-approved -> build -> qa -> fix -> retest -> done`。
+- 本轮主题：`gm-chat-economy-operations`
+- 当前 Sprint：`gm-chat-economy-write-operations`
+- 当前 spec：`docs/workflow/spec-gm-chat-economy-operations.md`
+- 当前 contract：`docs/workflow/tasks/gm-chat-economy-write-operations-contract.md`
+- 已完成：聊天广播/私聊、经济增加/扣除/设置、目标归属、管理员审计、双端 preview 和跨模块构建。
+- 已完成：本地 Arclight 1.20.1 / Java 17 中插件实际加载、loopback token、广播/私聊/离线拒绝与 Vault 增扣设置 smoke；测试余额已恢复，测试环境已清理。
+- 下一动作：部署前在已配置 MCSManager 的 1.20.1 实例执行 Panel -> Daemon -> 插件管理员 smoke，并以非管理员 session 验证 `403`；未做发布或推送。
+- 已有后端基础：Panel -> Daemon -> loopback 插件控制的结构化聊天 action，以及复用 Vault action 的 `economy_set`。
+- 未验证边界：已配置 Panel/Daemon 的真实管理员/非管理员请求、插件 heartbeat/快照、聊天 JSONL 与 Panel 审计的端到端采证。

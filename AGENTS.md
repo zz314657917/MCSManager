@@ -11,7 +11,7 @@
 - `daemon/`：MCSManager Daemon 后端，负责实例进程、文件、终端、Docker、主机指标等节点侧能力。
 - `common/`：Panel 和 Daemon 共用的 TypeScript 公共层与全局类型。
 - `languages/`：多语言文案资源。
-- `mcsm-monitor-plugin/`：Minecraft/Spigot 监控插件，Java 8，目标 Spigot API 1.12.2。
+- `mcsm-monitor-plugin/`：Minecraft/Spigot 监控插件，Java 17，目标 Spigot API 1.20.1。
 - `mcsmanager-mcp-server/`：MCSManager MCP stdio server，Node.js 20+，用于安全查询和操作实例。
 
 远端协作约定：
@@ -32,7 +32,7 @@
 
 - 监控 v1 不依赖 Prometheus/Grafana，面板通过 `/api/monitor/servers` 聚合当前状态。
 - 每台游戏主机运行 MCSManager daemon；面板机运行 panel/frontend，通过远程节点连接 daemon。
-- 1.12.2 服务端安装 `mcsm-monitor-plugin`，插件向本机 daemon 的 `/v1/plugin/heartbeat` 上报 TPS、人数和主线程状态。
+- 1.20.1 服务端安装 `mcsm-monitor-plugin`，插件向本机 daemon 的 `/v1/plugin/heartbeat` 上报 TPS、人数和主线程状态。
 - Linux 部署脚本在 `prod-scripts/linux/`；目标机需要先完成官方 MCSManager 基础安装。
 
 ## AI 知识库约定
@@ -152,9 +152,9 @@ sudo bash prod-scripts/linux/deploy-monitor-web-from-repo.sh
 
 ## Minecraft 插件要点
 
-- 插件位于 `mcsm-monitor-plugin/`，Java 8，Spigot API 1.12.2。
-- 监控插件已改为自己计算 TPS，不依赖高版本 Paper API；保持 1.12.2 兼容。
-- 避免使用高版本 Bukkit/Paper API。
+- 插件位于 `mcsm-monitor-plugin/`，Java 17，Spigot API 1.20.1。
+- 监控插件自行计算 TPS，不依赖 Paper 专有 API；保持 1.20.1 的 Bukkit/Spigot API 兼容边界。
+- 避免使用 NMS、CraftBukkit 版本包和不必要的 Paper 专有 API。
 - 不要在异步线程直接调用不安全的 Bukkit API。
 - 玩家身份优先使用 UUID，不要依赖玩家名作为唯一标识。
 - 修改后优先执行 `mvn package`。

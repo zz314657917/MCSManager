@@ -26,7 +26,7 @@ last_verified: 2026-04-15
 - 表格排序使用原始数值字段，不要对带单位的展示文本排序
 
 # 插件规则
-- Java 8，Spigot/Bukkit 1.12.2
+- Java 17，Spigot/Bukkit 1.20.1
 - 不要在异步线程直接调用 Bukkit API
 - 玩家身份优先使用 UUID
 - 配置变更必须兼容旧配置缺失字段并提供默认值

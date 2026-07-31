@@ -9,3 +9,7 @@
 260627 10:48 | ux-sprint-01-control-target-danger | build-ready | Codex | frontend/src/views/ControlConsole.vue; frontend/src/components/control/ControlActionButtons.vue
 260627 10:51 | ux-sprint-01-control-target-danger | qa-pass | Codex | docs/workflow/worker-results/ux-sprint-01-control-target-danger-result.md
 260727 19:40 | upstream-v10.17.0-hardening | integration-qa-pass | Codex | docs/workflow/tasks/upstream-v10.17.0-hardening-qa.md
+260731 00:00 | gm-chat-economy-write-operations | contract-draft | Codex | docs/workflow/spec-gm-chat-economy-operations.md; docs/workflow/tasks/gm-chat-economy-write-operations-contract.md
+260731 00:01 | gm-chat-economy-write-operations | contract-approved | Codex | docs/workflow/gm-chat-economy-write-operations-review.md
+260731 00:02 | gm-chat-economy-write-operations | qa-pass | Codex | docs/workflow/gm-chat-economy-write-operations-qa.md
+260731 11:58 | gm-chat-economy-write-operations | arclight-1201-runtime-smoke-pass | Codex | docs/workflow/gm-chat-economy-write-operations-qa.md

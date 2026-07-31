@@ -76,4 +76,4 @@ last_verified: 2026-04-20
 - `frontend/src/hooks/useControlPreviewState.ts`：preview 数据和真实 API 分流集中在这里
 - `daemon/src/service/monitor_service.ts`：心跳缓存、历史采样、进程指标和磁盘缓存集中在这里
 - `panel/src/app/routers/monitor_router.ts`：聚合多个远程节点数据，改动会影响整个监控页
-- `mcsm-monitor-plugin/`：Java 8、Spigot 1.12.2 兼容要求严格
+- `mcsm-monitor-plugin/`：Java 17、Spigot 1.20.1 兼容要求严格
