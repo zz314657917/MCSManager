@@ -3,7 +3,6 @@ import type { OperationsMobileNavItem } from "@/components/operations/mobileNav"
 import {
   ControlOutlined,
   DollarCircleOutlined,
-  MessageOutlined,
   TeamOutlined
 } from "@ant-design/icons-vue";
 import { computed } from "vue";
@@ -21,7 +20,6 @@ const currentPath = computed(() => route.path);
 const iconMap = {
   control: ControlOutlined,
   players: TeamOutlined,
-  chat: MessageOutlined,
   economy: DollarCircleOutlined
 } as const;
 
@@ -38,6 +36,9 @@ const navigateTo = (item: OperationsMobileNavItem) => {
     class="operations-mobile-nav"
     aria-label="Operations navigation"
     data-testid="operations-mobile-nav"
+    :style="{
+      gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))`
+    }"
   >
     <button
       v-for="item in items"
@@ -60,7 +61,6 @@ const navigateTo = (item: OperationsMobileNavItem) => {
   bottom: 0;
   z-index: 7;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--design-hairline);

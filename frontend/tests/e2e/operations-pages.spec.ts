@@ -392,6 +392,46 @@ test("gm desktop preview supports player selection and economy action", async ({
     .toBe(before + 2000);
 });
 
+test("gm merged desktop view keeps selection while switching internal workspaces", async ({
+  page
+}, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/gm", "gm-console");
+
+  const headerRoutes = page.locator(".app-header-content > nav.btns > .nav-button");
+  await expect(headerRoutes.filter({ hasText: /GM 管理|GM Management/ })).toHaveCount(1);
+  await expect(headerRoutes.filter({ hasText: /^(聊天|Chat)$/ })).toHaveCount(0);
+
+  const selectedPlayer = page.getByTestId(
+    "gm-player-card-relay-home-a-survival-main-preview-player-1"
+  );
+  await selectedPlayer.click();
+  await expect(selectedPlayer).toHaveClass(/(?:^|\s)is-active(?:\s|$)/);
+
+  const viewSwitch = page.getByTestId("gm-view-switch");
+  await viewSwitch.locator("label.ant-segmented-item").filter({ hasText: "聊天" }).click();
+
+  await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "chat");
+  await expect(page.getByTestId("gm-chat-panel")).toBeVisible();
+  await expect(page.locator(".gm-console__operations")).toHaveCount(0);
+  await expect(selectedPlayer).toHaveClass(/(?:^|\s)is-active(?:\s|$)/);
+  await expect(page.getByTestId("gm-chat-target")).toContainText("私聊 爱马仕");
+  await expect
+    .poll(() => page.evaluate(() => new URLSearchParams(location.hash.split("?")[1]).get("view")))
+    .toBe("chat");
+
+  await viewSwitch.locator("label.ant-segmented-item").filter({ hasText: "玩家操作" }).click();
+
+  await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "manage");
+  await expect(page.getByTestId("gm-operations-panel")).toBeVisible();
+  await expect(page.getByTestId("gm-chat-panel")).toHaveCount(0);
+  await expect(selectedPlayer).toHaveClass(/(?:^|\s)is-active(?:\s|$)/);
+  await expect
+    .poll(() => page.evaluate(() => new URLSearchParams(location.hash.split("?")[1]).get("view")))
+    .toBeNull();
+});
+
 test("gm desktop preview asks confirmation before risky action", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
 
@@ -446,6 +486,15 @@ test("gm chat mobile preview keeps chat panel within viewport and supports nav s
   await gotoPreviewRoute(page, "/gm/chat", "gm-console");
   await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "chat");
   await expect(page.getByTestId("operations-mobile-nav")).toBeVisible();
+  await expect(page.getByTestId("mobile-nav-item-chat")).toHaveCount(0);
+
+  const bottomNavItems = ["control", "players", "economy"].map((key) =>
+    page.getByTestId(`mobile-nav-item-${key}`)
+  );
+  const bottomNavBoxes = await Promise.all(bottomNavItems.map((item) => item.boundingBox()));
+  expect(bottomNavBoxes.every(Boolean)).toBe(true);
+  const bottomNavWidths = bottomNavBoxes.map((box) => box?.width ?? 0);
+  expect(Math.max(...bottomNavWidths) - Math.min(...bottomNavWidths)).toBeLessThanOrEqual(1);
 
   const panel = page.getByTestId("gm-chat-panel");
   await expect(panel).toBeVisible();
@@ -466,6 +515,16 @@ test("gm chat mobile preview keeps chat panel within viewport and supports nav s
   if (bubbleBox && viewport) {
     expect(bubbleBox.x + bubbleBox.width).toBeLessThanOrEqual(viewport.width + 1);
   }
+
+  const viewSwitch = page.getByTestId("gm-view-switch");
+  await viewSwitch.locator("label.ant-segmented-item").filter({ hasText: "玩家操作" }).click();
+  await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "manage");
+  await expect(page.getByTestId("gm-mobile-player-panel")).toBeVisible();
+  await expect(page.getByTestId("gm-chat-panel")).toHaveCount(0);
+
+  await viewSwitch.locator("label.ant-segmented-item").filter({ hasText: "聊天" }).click();
+  await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "chat");
+  await expect(page.getByTestId("gm-chat-panel")).toBeVisible();
 
   await page.getByTestId("mobile-nav-item-control").click();
   await expect(page.getByTestId("control-console")).toBeVisible();

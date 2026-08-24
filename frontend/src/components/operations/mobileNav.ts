@@ -1,6 +1,6 @@
 import { t } from "@/lang/i18n";
 
-export type OperationsMobileNavIcon = "control" | "players" | "chat" | "economy";
+export type OperationsMobileNavIcon = "control" | "players" | "economy";
 
 export type OperationsMobileNavItem = {
   key: string;
@@ -21,12 +21,6 @@ export const OPERATIONS_MOBILE_NAV_ITEMS: OperationsMobileNavItem[] = [
     label: t("TXT_CODE_GM_NAV_PLAYERS"),
     path: "/gm",
     icon: "players"
-  },
-  {
-    key: "chat",
-    label: t("TXT_CODE_PLAYERS_CHAT"),
-    path: "/gm/chat",
-    icon: "chat"
   },
   {
     key: "economy",

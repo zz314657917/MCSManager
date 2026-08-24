@@ -2,7 +2,7 @@
 title: Frontend Control Console
 type: module-note
 module: frontend
-last_verified: 2026-07-26
+last_verified: 2026-08-24
 ---
 
 # 相关文件
@@ -39,5 +39,7 @@ last_verified: 2026-07-26
 
 # 运维页面入口
 - `/control` 是主控制台，包含实例管理、日志终端和批量操作入口。
-- `/gm` 是 GM 玩家管理页，`/gm/chat` 是 GM 聊天页。
+- `/gm` 是唯一的 GM 管理主入口，页面内通过 `view=chat` query 切换“玩家操作 / 聊天”工作区；只改 query 不会触发根 `RouterView` 按 path 重建，因此当前实例、玩家选择和 GM 轮询状态可以保留。
+- `/gm/chat` 只作为旧链接兼容入口，必须重定向到 `/gm?view=chat` 并保留 `preview` 等既有 query 与 hash；不要重新把它注册为 `mainMenu`。
+- operations 移动底栏只保留 Control、GM 玩家和经济中心三个顶级入口；聊天入口放在 GM 页面内部，三个底栏入口应等宽填满。
 - `/players` 是独立玩家互动预览页，挂载 `PlayerInteractionConsole.vue`，不应再重定向到 `/gm`。

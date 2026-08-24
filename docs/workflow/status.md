@@ -1,24 +1,27 @@
 ---
 phase: done
-current_sprint: gm-chat-economy-write-operations
-total_sprints: 1
-pending_action: panel-daemon-admin-and-403-smoke-before-deployment
+current_sprint: gm-chat-navigation-merge
+total_sprints: 3
+pending_action: user-authorized-deployment-only
 project_type: mcsm-web-plugin
-qa_mode: browser-plugin
+qa_mode: browser
 approval_required: false
-last_verified: 2026-07-31
+last_verified: 2026-08-24
 ---
 
 # Workflow Status
 
 - 当前阶段：`done`
-- 本轮主题：`gm-chat-economy-operations`
-- 当前 Sprint：`gm-chat-economy-write-operations`
-- 当前 spec：`docs/workflow/spec-gm-chat-economy-operations.md`
-- 当前 contract：`docs/workflow/tasks/gm-chat-economy-write-operations-contract.md`
-- 已完成：聊天广播/私聊、经济增加/扣除/设置、目标归属、管理员审计、双端 preview 和跨模块构建。
-- 已完成：本地 Arclight 1.20.1 / Java 17 中插件实际加载、loopback token、广播/私聊/离线拒绝与 Vault 增扣设置 smoke；测试余额已恢复，测试环境已清理。
-- 已完成：三笔主题提交已推送到 `zzrepo/master`，远端与本地 `HEAD` 一致。
-- 下一动作：部署前在已配置 MCSManager 的 1.20.1 实例执行 Panel -> Daemon -> 插件管理员 smoke，并以非管理员 session 验证 `403`。
-- 已有后端基础：Panel -> Daemon -> loopback 插件控制的结构化聊天 action，以及复用 Vault action 的 `economy_set`。
-- 未验证边界：已配置 Panel/Daemon 的真实管理员/非管理员请求、插件 heartbeat/快照、聊天 JSONL 与 Panel 审计的端到端采证。
+- 本轮主题：`gm-chat-navigation-merge`
+- 当前 Sprint：`gm-chat-navigation-merge`
+- 当前 contract：`docs/workflow/tasks/gm-chat-navigation-merge-contract.md`
+- 用户已批准方向：合并 `/gm` 与 `/gm/chat` 的顶级入口和页面生命周期，保留“玩家操作 / 聊天”内部工作区。
+- 当前边界：只改前端路由、GM 页面、operations 移动导航、定向 E2E 与必要 workflow/知识说明。
+- Contract review：`docs/workflow/gm-chat-navigation-merge-review.md`，结论 `PASS`。
+- 已完成实现：主导航合并、旧 URL 兼容、query 内部切换、移动底栏三项等宽和 E2E 覆盖均已落地。
+- 首轮 QA：`20 passed / 19 skipped / 1 failed`；唯一失败归因为测试类名断言错误，修复记录见 `docs/workflow/gm-chat-navigation-merge-fix-log.md`。
+- 重测与最终 QA：失败项定向 `1 passed`，完整桌面/移动 operations E2E 为 `21 passed / 19 skipped`；报告见 `docs/workflow/gm-chat-navigation-merge-qa.md`。
+- 最终裁决：`PASS`。类型检查、生产构建、CLI 实际交互、定向 E2E 与 `git diff --check` 均通过。
+- 当前交付：精确范围提交并推送到 `zzrepo/master`；生产前端替换仍需另行授权。
+- 保护项：不覆盖现有 GM 侧栏搜索、聊天全宽布局、ECharts/ZRender 修复和验证产物。
+- 历史待办不变：真实已配置 Panel/Daemon 的管理员与非管理员端到端 smoke 仍待部署前执行。

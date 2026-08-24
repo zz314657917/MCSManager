@@ -70,13 +70,34 @@ const {
   sendChat
 } = gmState;
 
-const isChatPage = computed(() => route.path === "/gm/chat");
-const pageTitle = computed(() => (isChatPage.value ? "聊天" : "玩家管理"));
-const fallbackBackTo = computed(() => (isChatPage.value ? "/gm" : "/control"));
-const backLabel = computed(() => (isChatPage.value ? "玩家管理" : "Control"));
-const pageEyebrow = computed(() =>
-  isLocalPreviewMode ? "本地预览 / 仅管理员 / 结构化 GM 操作" : "仅管理员 / 结构化 GM 操作"
-);
+type GmViewMode = "manage" | "chat";
+
+const viewModeOptions = [
+  { label: "玩家操作", value: "manage" },
+  { label: "聊天", value: "chat" }
+];
+const viewMode = computed<GmViewMode>({
+  get: () => (route.query.view === "chat" ? "chat" : "manage"),
+  set: (nextView) => {
+    const query = { ...route.query };
+    if (nextView === "chat") {
+      query.view = "chat";
+    } else {
+      delete query.view;
+    }
+    void router.replace({ path: "/gm", query, hash: route.hash });
+  }
+});
+const isChatPage = computed(() => viewMode.value === "chat");
+const pageTitle = "GM 管理";
+const fallbackBackTo = "/control";
+const backLabel = "Control";
+const pageEyebrow = computed(() => {
+  const prefix = isLocalPreviewMode ? "本地预览 / " : "";
+  return isChatPage.value
+    ? `${prefix}聊天监控 / 管理员消息发送`
+    : `${prefix}仅管理员 / 结构化 GM 操作`;
+});
 
 const currentChatMode = computed(() => {
   if (!currentServer.value) return "--";
@@ -123,6 +144,12 @@ const serverLabelMap = computed<Record<string, string>>(() =>
 );
 
 const chatTimelineMeta = computed(() => {
+  if (isChatPage.value) {
+    return currentServer.value
+      ? `所有实例汇总 / 当前发送目标 ${currentServer.value.instanceDisplayName}`
+      : "请选择实例查看聊天";
+  }
+
   const playerLabel = currentPlayer.value?.playerName || "未选择玩家";
   return `所有实例汇总 / 当前操作玩家 ${playerLabel}`;
 });
@@ -166,10 +193,6 @@ const handleSelectPlayer = (payload: { playerUuid: string; serverKey: string }) 
 
 const openControlPage = () => {
   router.push("/control");
-};
-
-const openManagePage = () => {
-  router.push("/gm");
 };
 
 const handleSendChat = async () => {
@@ -278,13 +301,12 @@ watch(
         </div>
 
         <div class="gm-console-page__desktop-toolbar-actions">
-          <a-button v-if="isChatPage" @click="openManagePage">
-            <template #icon>
-              <TeamOutlined />
-            </template>
-            <span>玩家管理</span>
-          </a-button>
-          <a-button v-else @click="openControlPage">
+          <ASegmented
+            v-model:value="viewMode"
+            :options="viewModeOptions"
+            data-testid="gm-view-switch"
+          />
+          <a-button @click="openControlPage">
             <template #icon>
               <AppstoreOutlined />
             </template>
@@ -314,6 +336,14 @@ watch(
       </template>
 
       <div class="gm-console">
+        <div v-if="isPhone" class="gm-console__mobile-view-switch">
+          <ASegmented
+            v-model:value="viewMode"
+            :options="viewModeOptions"
+            data-testid="gm-view-switch"
+          />
+        </div>
+
         <a-alert
           v-if="latestError"
           class="gm-console__alert"
@@ -323,7 +353,7 @@ watch(
           data-testid="gm-error-alert"
         />
 
-        <section v-if="currentServer && !isPhone" class="gm-console__summary-card">
+        <section v-if="currentServer && !isPhone && !isChatPage" class="gm-console__summary-card">
           <div class="gm-console__summary-top">
             <div class="gm-console__summary-copy">
               <div class="gm-console__summary-kicker">
@@ -358,7 +388,7 @@ watch(
             </article>
           </div>
         </section>
-        <section v-else-if="!isPhone" class="gm-console__summary-card gm-console__summary-card--empty">
+        <section v-else-if="!isPhone && !isChatPage" class="gm-console__summary-card gm-console__summary-card--empty">
           <a-empty :image="false" description="当前没有可用实例，请先选择在线节点。" />
         </section>
 
@@ -366,11 +396,10 @@ watch(
           v-if="!isPhone || isChatPage"
           class="gm-console__workspace"
           :class="{
-            'gm-console__workspace--mobile': isPhone,
-            'gm-console__workspace--chat-focus': isChatPage && !isPhone
+            'gm-console__workspace--mobile': isPhone
           }"
         >
-          <section v-if="!isPhone" class="gm-console__operations">
+          <section v-if="!isPhone && !isChatPage" class="gm-console__operations">
             <GmOperationsPanel
               :player="currentPlayer"
               :server="currentServer"
@@ -384,7 +413,7 @@ watch(
             />
           </section>
 
-          <section class="gm-console__chat-panel" data-testid="gm-chat-panel">
+          <section v-if="isChatPage" class="gm-console__chat-panel" data-testid="gm-chat-panel">
             <div class="gm-console__chat-toolbar">
               <div class="gm-console__chat-toolbar-copy">
                 <div class="gm-console__chat-title">全服聊天时间线</div>
@@ -611,6 +640,24 @@ watch(
   flex-shrink: 0;
 }
 
+.gm-console__mobile-view-switch {
+  flex-shrink: 0;
+  padding: 10px;
+  border: 1px solid var(--design-hairline);
+  border-radius: var(--design-radius-lg);
+  background: var(--design-surface-card);
+}
+
+.gm-console__mobile-view-switch :deep(.ant-segmented),
+.gm-console__mobile-view-switch :deep(.ant-segmented-group) {
+  width: 100%;
+}
+
+.gm-console__mobile-view-switch :deep(.ant-segmented-item) {
+  flex: 1;
+  text-align: center;
+}
+
 .gm-console__summary-card,
 .gm-console__chat-panel,
 .gm-console__operations {
@@ -700,7 +747,7 @@ watch(
 
 .gm-console__workspace {
   display: grid;
-  grid-template-columns: minmax(500px, 1.35fr) minmax(320px, 0.72fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
   flex: 1;
@@ -715,10 +762,6 @@ watch(
   min-width: 0;
   width: 100%;
   max-width: 100%;
-}
-
-.gm-console__workspace--chat-focus {
-  grid-template-columns: minmax(320px, 0.72fr) minmax(500px, 1.35fr);
 }
 
 .gm-console__mobile-player-panel {
@@ -920,9 +963,6 @@ watch(
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .gm-console__workspace {
-    grid-template-columns: minmax(440px, 1.15fr) minmax(300px, 0.85fr);
-  }
 }
 
 @media (max-width: 768px) {

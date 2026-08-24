@@ -14,6 +14,7 @@ import {
   createRouter,
   createWebHashHistory,
   type RouteLocationNormalized,
+  type RouteLocationRaw,
   type RouteRecordRaw
 } from "vue-router";
 
@@ -22,12 +23,12 @@ export interface RouterMetaInfo {
   mainMenu?: boolean;
   permission?: number;
   redirect?:
-    | string
+    | RouteLocationRaw
     | ((
         userInfo: LoginUserInfo | undefined,
         to: RouteLocationNormalized,
         from: RouteLocationNormalized
-      ) => string);
+      ) => RouteLocationRaw);
   onlyDisplayEditMode?: boolean;
   customClass?: string[];
   condition?: () => boolean;
@@ -153,9 +154,17 @@ const originRouterConfig: RouterConfig[] = [
     component: GMConsole,
     meta: {
       permission: ROLE.ADMIN,
-      mainMenu: true,
+      mainMenu: false,
       chromeMode: "minimal",
-      desktopChromeMode: "top-nav"
+      desktopChromeMode: "top-nav",
+      redirect: (_userInfo, to) => ({
+        path: "/gm",
+        query: {
+          ...to.query,
+          view: "chat"
+        },
+        hash: to.hash
+      })
     }
   },
   {
@@ -447,7 +456,7 @@ router.beforeEach(async (to, from, next) => {
       const userInfo = state.userInfo;
       return next(to.meta.redirect(userInfo, to, from));
     }
-    return next(to.meta.redirect as string);
+    return next(to.meta.redirect as RouteLocationRaw);
   }
 
   if (toRoutePath === "/sso/callback") {
