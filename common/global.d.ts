@@ -453,6 +453,8 @@ declare global {
     | "lp_temp_permission_unset"
     | "chat_mute"
     | "chat_unmute"
+    | "player_ban"
+    | "player_kick"
     | "chat_broadcast"
     | "chat_private";
 
@@ -679,6 +681,21 @@ declare global {
         daemonId: string;
         instanceId: string;
         playerUuid: string;
+      }
+    | {
+        kind: "player_ban";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        reason?: string;
+        durationSeconds?: number;
+      }
+    | {
+        kind: "player_kick";
+        daemonId: string;
+        instanceId: string;
+        playerUuid: string;
+        reason?: string;
       };
 
   interface IMcsmGmActionResult {

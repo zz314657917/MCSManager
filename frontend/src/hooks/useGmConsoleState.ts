@@ -74,7 +74,9 @@ export type GmPanelActionPayload =
   | { kind: "lp_temp_group_add" | "lp_temp_group_remove"; group: string; duration: string }
   | { kind: "lp_temp_permission_set" | "lp_temp_permission_unset"; node: string; duration: string }
   | { kind: "chat_mute"; durationSeconds: number; reason?: string }
-  | { kind: "chat_unmute" };
+  | { kind: "chat_unmute" }
+  | { kind: "player_ban"; reason?: string; durationSeconds?: number }
+  | { kind: "player_kick"; reason?: string };
 
 export function useGmConsoleState() {
   const { isDocumentVisible } = useDocumentVisibility();

@@ -32,7 +32,8 @@ const emit = defineEmits<{
   (event: "select-player", payload: PlayerSelection): void;
 }>();
 
-const searchKeyword = ref("");
+const serverSearchKeyword = ref("");
+const playerSearchKeyword = ref("");
 
 const isServerActive = (server: IMcsmGmOverviewServer) =>
   getGmServerKey(server) === props.selectedServerKey;
@@ -52,14 +53,36 @@ const getStatusColor = (status: number) => {
   if (status === 2) return "blue";
   if (status === 1) return "orange";
   if (status === -1) return "gold";
-  return "default";
+  return "red";
 };
 
 const getPlayerServerKey = (player: IMcsmGmPlayerPresence) => getGmServerKey(player);
 const sourcePlayers = computed(() => props.allPlayers);
 
+const filteredServers = computed(() => {
+  const keyword = serverSearchKeyword.value.trim().toLowerCase();
+  if (!keyword) return props.servers;
+
+  return props.servers.filter((server) =>
+    [
+      server.instanceDisplayName,
+      server.daemonDisplayName,
+      server.daemonEndpoint,
+      server.instanceId
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(keyword)
+  );
+});
+
+const serverCountText = computed(() => {
+  if (!serverSearchKeyword.value.trim()) return String(props.servers.length);
+  return `${filteredServers.value.length}/${props.servers.length}`;
+});
+
 const filteredPlayers = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase();
+  const keyword = playerSearchKeyword.value.trim().toLowerCase();
   if (!keyword) return sourcePlayers.value;
 
   return sourcePlayers.value.filter((player) =>
@@ -74,12 +97,12 @@ const playerGroups = computed(() => groupPlayersByServer(filteredPlayers.value))
 
 const playerCountText = computed(() => {
   const total = sourcePlayers.value.length;
-  if (!searchKeyword.value.trim()) return String(total);
+  if (!playerSearchKeyword.value.trim()) return String(total);
   return `${filteredPlayers.value.length}/${total}`;
 });
 
 const playerEmptyText = computed(() => {
-  if (searchKeyword.value.trim()) return "没有匹配的在线玩家";
+  if (playerSearchKeyword.value.trim()) return "没有匹配的在线玩家";
   return "当前没有在线玩家";
 });
 
@@ -107,10 +130,11 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
         </div>
 
         <a-input
-          v-model:value="searchKeyword"
+          v-model:value="playerSearchKeyword"
           class="gm-sidebar__search"
           allow-clear
           placeholder="搜索玩家名 / 服务器"
+          data-testid="gm-player-search"
         />
 
         <a-spin :spinning="playerLoading">
@@ -153,15 +177,26 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
     </template>
 
     <template v-else>
-      <section class="gm-sidebar__section">
+      <section class="gm-sidebar__section gm-sidebar__section--servers">
         <div class="gm-sidebar__section-header">
           <span>实例筛选</span>
-          <a-tag>{{ servers.length }}</a-tag>
+          <a-tag>{{ serverCountText }}</a-tag>
         </div>
 
-        <div class="gm-sidebar__server-list gm-sidebar__server-list--compact">
+        <a-input
+          v-model:value="serverSearchKeyword"
+          class="gm-sidebar__search"
+          allow-clear
+          placeholder="搜索实例 / 节点"
+          data-testid="gm-server-search"
+        />
+
+        <div
+          v-if="filteredServers.length"
+          class="gm-sidebar__server-list gm-sidebar__server-list--compact"
+        >
           <button
-            v-for="server in servers"
+            v-for="server in filteredServers"
             :key="getGmServerKey(server)"
             type="button"
             class="gm-sidebar__server-card gm-sidebar__server-card--compact"
@@ -175,6 +210,7 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
             </a-tag>
           </button>
         </div>
+        <a-empty v-else :image="false" description="没有匹配的实例" />
       </section>
 
       <section class="gm-sidebar__section gm-sidebar__section--players">
@@ -184,10 +220,11 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
         </div>
 
         <a-input
-          v-model:value="searchKeyword"
+          v-model:value="playerSearchKeyword"
           class="gm-sidebar__search"
           allow-clear
           placeholder="搜索玩家名 / 服务器"
+          data-testid="gm-player-search"
         />
 
         <a-spin :spinning="playerLoading">
@@ -233,14 +270,16 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
 
 <style scoped lang="scss">
 .gm-sidebar {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 14px;
   min-height: 0;
   height: 100%;
 }
 
 .gm-sidebar--mobile {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
@@ -251,12 +290,14 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
   border-radius: 18px;
   background: var(--design-surface-card);
   box-shadow: none;
+  overflow: hidden;
 }
 
+.gm-sidebar__section--servers,
 .gm-sidebar__section--players {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .gm-sidebar__section-header,
@@ -286,9 +327,20 @@ const normalizeTestKey = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-"
   gap: 10px;
 }
 
+.gm-sidebar__server-list,
 .gm-sidebar__player-list {
   min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.gm-sidebar__section--players :deep(.ant-spin-nested-loading),
+.gm-sidebar__section--players :deep(.ant-spin-container) {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .gm-sidebar__player-group {

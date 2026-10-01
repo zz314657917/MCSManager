@@ -3,6 +3,7 @@ package com.mcsmanager.monitor;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.BanList;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,6 +52,9 @@ final class ControlActionDispatcher {
         }
         if ("mute".equalsIgnoreCase(action)) {
             return handleMute(request);
+        }
+        if ("player".equalsIgnoreCase(action)) {
+            return handlePlayerModeration(request);
         }
         if ("inventory".equalsIgnoreCase(action)) {
             return handleInventory(request);
@@ -114,6 +118,36 @@ final class ControlActionDispatcher {
             return ActionResult.error(409, "Player must be online.");
         }
         return plugin.getInventorySnapshotAdapter().snapshot(player);
+    }
+
+    private ActionResult handlePlayerModeration(Map<String, Object> request) {
+        Player player = resolveOnlinePlayer(request);
+        if (player == null) {
+            return ActionResult.error(409, "Player must be online.");
+        }
+
+        String operation = readString(request, "operation");
+        String reason = readString(request, "reason");
+        if (reason.isEmpty()) {
+            reason = "违反服务器规则";
+        }
+
+        if ("kick".equalsIgnoreCase(operation)) {
+            player.kickPlayer(reason);
+            return ActionResult.success("Player kicked.", java.util.Collections.<String, Object>singletonMap("playerName", player.getName()));
+        }
+
+        if ("ban".equalsIgnoreCase(operation)) {
+            long durationSeconds = readLong(request, "durationSeconds");
+            java.util.Date expiration = durationSeconds > 0
+                    ? new java.util.Date(System.currentTimeMillis() + durationSeconds * 1000L)
+                    : null;
+            Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), reason, expiration, "MCSManager");
+            player.kickPlayer(reason);
+            return ActionResult.success("Player banned.", java.util.Collections.<String, Object>singletonMap("playerName", player.getName()));
+        }
+
+        return ActionResult.error(400, "Unsupported player operation: " + operation);
     }
 
     private ActionResult handleChat(Map<String, Object> request) {

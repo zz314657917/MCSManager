@@ -836,6 +836,13 @@ export function useControlPlayerPanelPreviewState(currentTarget: Readonly<Ref<Co
         message = `已解除 ${player.playerName} 的禁言。`;
       }
 
+      if (payload.kind === "player_ban" || payload.kind === "player_kick") {
+        const action = payload.kind === "player_ban" ? "封禁" : "踢出";
+        message = `已${action} ${player.playerName}。`;
+        record.presence.online = false;
+        record.presence.lastSeenAt = new Date().toISOString();
+      }
+
       record.presence.lastSeenAt = new Date().toISOString();
       record.auditRecords.unshift(
         createAuditRecord(player, server, payload.kind, true, message, beforeValue, afterValue)

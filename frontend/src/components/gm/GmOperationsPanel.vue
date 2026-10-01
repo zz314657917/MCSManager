@@ -47,6 +47,16 @@ const temporaryPermissionNode = ref("");
 const temporaryPermissionDuration = ref("7d");
 const muteReason = ref("违规发言");
 const customMuteMinutes = ref<number | undefined>(60);
+const playerModerationReason = ref("违反服务器规则");
+const playerBanMinutes = ref<number | undefined>();
+const selectedActionSection = ref<"chat" | "player" | "groups" | "permissions">("permissions");
+
+const actionSectionOptions = [
+  { label: "聊天管理", value: "chat" },
+  { label: "封禁 / 踢出", value: "player" },
+  { label: "权限组", value: "groups" },
+  { label: "权限节点", value: "permissions" }
+];
 
 const numberFormatter = new Intl.NumberFormat("zh-CN");
 const createEmptyInventorySlot = (
@@ -184,6 +194,9 @@ watch(
     temporaryPermissionDuration.value = "7d";
     muteReason.value = "违规发言";
     customMuteMinutes.value = 60;
+    playerModerationReason.value = "违反服务器规则";
+    playerBanMinutes.value = undefined;
+    selectedActionSection.value = "permissions";
   }
 );
 
@@ -284,6 +297,10 @@ const getActionLabel = (kind: string) => {
       return "禁言";
     case "chat_unmute":
       return "解除禁言";
+    case "player_ban":
+      return "封禁玩家";
+    case "player_kick":
+      return "踢出玩家";
     default:
       return kind;
   }
@@ -345,6 +362,18 @@ const buildActionConfirmConfig = (payload: GmPanelActionPayload): ActionConfirmC
       return {
         title: "确认解除禁言",
         content: `将解除 ${playerName} 的禁言状态。`,
+        danger: true
+      };
+    case "player_ban":
+      return {
+        title: "确认封禁玩家",
+        content: `将封禁 ${playerName}${payload.durationSeconds ? ` ${formatGmRelativeSeconds(payload.durationSeconds)}` : "（永久）"}，原因：${payload.reason || "违反服务器规则"}。`,
+        danger: true
+      };
+    case "player_kick":
+      return {
+        title: "确认踢出玩家",
+        content: `将踢出 ${playerName}，原因：${payload.reason || "违反服务器规则"}。`,
         danger: true
       };
     default:
@@ -499,6 +528,21 @@ const executeCustomMute = () => {
 const executeUnmute = () =>
   runAction({
     kind: "chat_unmute"
+  });
+
+const executePlayerBan = () => {
+  const minutes = Number(playerBanMinutes.value || 0);
+  return runAction({
+    kind: "player_ban",
+    reason: playerModerationReason.value.trim() || "违反服务器规则",
+    durationSeconds: minutes > 0 ? Math.round(minutes * 60) : undefined
+  });
+};
+
+const executePlayerKick = () =>
+  runAction({
+    kind: "player_kick",
+    reason: playerModerationReason.value.trim() || "违反服务器规则"
   });
 </script>
 
@@ -752,7 +796,23 @@ const executeUnmute = () =>
         </article>
       </section>
 
-      <section class="gm-operations-panel__card">
+      <section class="gm-operations-panel__card gm-operations-panel__behavior-selector">
+        <div class="gm-operations-panel__section-head">
+          <div>
+            <h3>行为管理</h3>
+            <span>选择行为后显示对应参数</span>
+          </div>
+        </div>
+        <a-select
+          v-model:value="selectedActionSection"
+          class="gm-operations-panel__behavior-select"
+          :options="actionSectionOptions"
+          :disabled="busy"
+          data-testid="gm-action-section-select"
+        />
+      </section>
+
+      <section v-if="selectedActionSection === 'chat'" class="gm-operations-panel__card">
         <div class="gm-operations-panel__section-head">
           <div>
             <h3>聊天管理</h3>
@@ -810,9 +870,55 @@ const executeUnmute = () =>
         </div>
       </section>
 
-      <section class="gm-operations-panel__card">
+      <section v-if="selectedActionSection === 'player'" class="gm-operations-panel__card">
+        <div class="gm-operations-panel__section-head">
+          <div>
+            <h3>封禁 / 踢出</h3>
+            <span>封禁会立即踢出玩家；时长留空表示永久封禁</span>
+          </div>
+        </div>
+        <div class="gm-operations-panel__action-grid gm-operations-panel__action-grid--player">
+          <a-input
+            v-model:value="playerModerationReason"
+            placeholder="原因"
+            :disabled="busy"
+            data-testid="gm-player-moderation-reason"
+          />
+          <a-input-number
+            v-model:value="playerBanMinutes"
+            :min="1"
+            :precision="0"
+            placeholder="封禁分钟，留空永久"
+            :disabled="busy"
+            data-testid="gm-player-ban-minutes"
+          />
+          <a-button
+            danger
+            :loading="busy"
+            :disabled="!player?.online"
+            data-testid="gm-player-ban"
+            @click="executePlayerBan"
+          >
+            封禁玩家
+          </a-button>
+          <a-button
+            danger
+            :loading="busy"
+            :disabled="!player?.online"
+            data-testid="gm-player-kick"
+            @click="executePlayerKick"
+          >
+            踢出玩家
+          </a-button>
+        </div>
+      </section>
+
+      <section
+        v-if="selectedActionSection === 'groups' || selectedActionSection === 'permissions'"
+        class="gm-operations-panel__card"
+      >
         <div class="gm-operations-panel__lp-grid">
-          <article class="gm-operations-panel__lp-block">
+          <article v-if="selectedActionSection === 'groups'" class="gm-operations-panel__lp-block">
             <div class="gm-operations-panel__section-head">
               <div>
                 <h3>组操作</h3>
@@ -901,7 +1007,7 @@ const executeUnmute = () =>
             </div>
           </article>
 
-          <article class="gm-operations-panel__lp-block">
+          <article v-if="selectedActionSection === 'permissions'" class="gm-operations-panel__lp-block">
             <div class="gm-operations-panel__section-head">
               <div>
                 <h3>权限操作</h3>
@@ -1070,6 +1176,18 @@ const executeUnmute = () =>
   background: var(--design-surface-card);
   box-shadow: none;
   min-width: 0;
+}
+
+.gm-operations-panel__behavior-selector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.gm-operations-panel__behavior-select {
+  width: min(280px, 100%);
+  flex: 0 0 auto;
 }
 
 .gm-operations-panel__summary {
@@ -1444,6 +1562,16 @@ const executeUnmute = () =>
 }
 
 @media (max-width: 900px) {
+  .gm-operations-panel__behavior-selector {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .gm-operations-panel__behavior-select {
+    width: 100%;
+  }
+
   .gm-operations-panel__grid,
   .gm-operations-panel__history-grid,
   .gm-operations-panel__lp-grid,

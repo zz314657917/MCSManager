@@ -547,6 +547,31 @@ watch(
   :deep(.ops-page-shell) {
     background: var(--design-canvas);
   }
+
+  :deep(.ops-page-shell--desktop-embedded) {
+    height: calc(100svh - 64px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :deep(.ops-page-shell--desktop-embedded .ops-page-shell__shell) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :deep(.ops-page-shell--desktop-embedded .ops-page-shell__sidebar),
+  :deep(.ops-page-shell--desktop-embedded .ops-page-shell__workspace) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :deep(.ops-page-shell--desktop-embedded .ops-page-shell__workspace) {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 }
 
 .gm-console-page__header-pill {

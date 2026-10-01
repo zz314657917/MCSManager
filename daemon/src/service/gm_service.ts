@@ -351,6 +351,21 @@ class GmService {
         };
       case "chat_unmute":
         return { action: "mute", operation: "unmute", playerUuid: request.playerUuid };
+      case "player_ban":
+        return {
+          action: "player",
+          operation: "ban",
+          playerUuid: request.playerUuid,
+          reason: request.reason,
+          durationSeconds: request.durationSeconds
+        };
+      case "player_kick":
+        return {
+          action: "player",
+          operation: "kick",
+          playerUuid: request.playerUuid,
+          reason: request.reason
+        };
       default:
         return { action: "", operation: "" };
     }

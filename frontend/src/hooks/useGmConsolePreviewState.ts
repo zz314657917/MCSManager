@@ -1016,6 +1016,17 @@ export function useGmConsolePreviewState() {
         });
       }
 
+      if (payload.kind === "player_ban" || payload.kind === "player_kick") {
+        const action = payload.kind === "player_ban" ? "封禁" : "踢出";
+        message = `已${action} ${player.playerName}。`;
+        record.presence.online = false;
+        record.presence.lastSeenAt = new Date().toISOString();
+        appendMessage(serverKey, {
+          senderType: "system",
+          text: `${player.playerName} 已被 GM ${action}：${payload.reason || "违反服务器规则"}`
+        });
+      }
+
       updateSelectedPlayerActivity();
       record.auditRecords.unshift(
         createAuditRecord(player, {
