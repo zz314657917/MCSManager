@@ -99,42 +99,15 @@ test("control desktop preview uses the remaining viewport height for the termina
   }
 });
 
-test("control desktop toolbar keeps target labels next to the title", async ({ page }, testInfo) => {
+test("control desktop uses target tabs instead of a duplicate toolbar", async ({ page }, testInfo) => {
   test.skip(isMobileProject(testInfo), "桌面布局仅在桌面项目执行");
   await page.setViewportSize({ width: 2000, height: 900 });
 
   await gotoPreviewRoute(page, "/control", "control-console");
 
-  const toolbarTitleWrap = page.locator(".control-console__desktop-toolbar-title-wrap");
-  const toolbarTitle = page.locator(".control-console__desktop-toolbar-title");
-  const toolbarPills = page.locator(".control-console__desktop-toolbar-pills");
-  const toolbarActions = page.locator(".control-console__desktop-toolbar-actions");
-  const targetListTitle = page.locator(".control-target-selector__header-copy > span:first-child");
-  const targetFilter = page.getByTestId("control-target-filter");
-  await expect(toolbarActions.getByRole("button", { name: /GM/ })).toHaveCount(0);
-
-  const [toolbarTitleWrapBox, toolbarTitleBox, toolbarPillsBox, toolbarActionsBox, targetListTitleBox, targetFilterBox] = await Promise.all([
-    toolbarTitleWrap.boundingBox(),
-    toolbarTitle.boundingBox(),
-    toolbarPills.boundingBox(),
-    toolbarActions.boundingBox(),
-    targetListTitle.boundingBox(),
-    targetFilter.boundingBox()
-  ]);
-
-  expect(toolbarTitleWrapBox).not.toBeNull();
-  expect(toolbarTitleBox).not.toBeNull();
-  expect(toolbarPillsBox).not.toBeNull();
-  expect(toolbarActionsBox).not.toBeNull();
-  expect(targetListTitleBox).not.toBeNull();
-  expect(targetFilterBox).not.toBeNull();
-
-  if (toolbarTitleWrapBox && toolbarTitleBox && toolbarPillsBox && toolbarActionsBox && targetListTitleBox && targetFilterBox) {
-    expect(toolbarPillsBox.x - (toolbarTitleBox.x + toolbarTitleBox.width)).toBeLessThanOrEqual(24);
-    expect(Math.abs(toolbarTitleWrapBox.y + toolbarTitleWrapBox.height / 2 - (toolbarActionsBox.y + toolbarActionsBox.height / 2))).toBeLessThanOrEqual(2);
-    expect(targetListTitleBox.height).toBeLessThanOrEqual(24);
-    expect(Math.abs(targetListTitleBox.y + targetListTitleBox.height / 2 - (targetFilterBox.y + targetFilterBox.height / 2))).toBeLessThanOrEqual(4);
-  }
+  await expect(page.locator(".control-console__desktop-toolbar")).toHaveCount(0);
+  await expect(page.getByTestId("control-target-tabs")).toBeVisible();
+  await expect(page.getByTestId("control-target-tab-home-daemon-a-global-global0001")).toContainText("Host Shell");
 });
 
 test("control target list header does not duplicate the batch selection count", async ({ page }, testInfo) => {
@@ -528,6 +501,106 @@ test("gm chat mobile preview keeps chat panel within viewport and supports nav s
 
   await page.getByTestId("mobile-nav-item-control").click();
   await expect(page.getByTestId("control-console")).toBeVisible();
+});
+
+test("gm desktop preview supports player kick and ban actions", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面链路仅在桌面项目执行");
+
+  await gotoPreviewRoute(page, "/gm", "gm-console");
+  await page.getByTestId("gm-player-card-relay-home-a-survival-main-preview-player-1").click();
+  await page.getByTestId("gm-action-section-select").click();
+  await page.locator(".ant-select-dropdown").last().getByText("封禁 / 踢出").click();
+
+  await page.getByTestId("gm-player-kick").click();
+  const confirmDialog = page.locator(".ant-modal-confirm");
+  await expect(confirmDialog.getByText("确认踢出玩家")).toBeVisible();
+  await confirmDialog.getByRole("button", { name: /确认执行/ }).click();
+  await expect(page.getByTestId("gm-last-action-result")).toContainText("踢出");
+});
+
+test("gm chat desktop preview uses a bounded chat-first layout", async ({ page }, testInfo) => {
+  test.skip(isMobileProject(testInfo), "桌面布局仅在桌面项目执行");
+  await page.setViewportSize({ width: 2048, height: 1152 });
+
+  await gotoPreviewRoute(page, "/gm/chat", "gm-console");
+  await expect(page.getByTestId("gm-console")).toHaveAttribute("data-page-mode", "chat");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const [path, query = ""] = location.hash.slice(1).split("?");
+        return {
+          path,
+          preview: new URLSearchParams(query).get("preview"),
+          view: new URLSearchParams(query).get("view")
+        };
+      })
+    )
+    .toEqual({ path: "/gm", preview: "1", view: "chat" });
+  await expect(page.locator(".gm-console__summary-card")).toHaveCount(0);
+  await expect(page.locator(".gm-console__operations")).toHaveCount(0);
+  await expect(page.getByTestId("gm-server-search")).toBeVisible();
+  await expect(page.getByTestId("gm-player-search")).toBeVisible();
+  await expect(page.getByTestId("gm-player-card-relay-home-a-survival-main-preview-player-1")).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>('[data-testid="gm-chat-panel"]');
+    const body = document.querySelector<HTMLElement>('[data-testid="gm-chat-body"]');
+    const workspace = document.querySelector<HTMLElement>(".gm-console__workspace");
+    const serverSection = document.querySelector<HTMLElement>(".gm-sidebar__section--servers");
+    const playerSection = document.querySelector<HTMLElement>(".gm-sidebar__section--players");
+    const sidebarServerList = document.querySelector<HTMLElement>(".gm-sidebar__server-list");
+    const sidebarPlayerList = document.querySelector<HTMLElement>(".gm-sidebar__player-list");
+
+    if (
+      !panel ||
+      !body ||
+      !workspace ||
+      !serverSection ||
+      !playerSection ||
+      !sidebarServerList ||
+      !sidebarPlayerList
+    ) {
+      return undefined;
+    }
+
+    const panelRect = panel.getBoundingClientRect();
+    const serverSectionRect = serverSection.getBoundingClientRect();
+    const playerSectionRect = playerSection.getBoundingClientRect();
+    const bodyStyle = window.getComputedStyle(body);
+    const serverListStyle = window.getComputedStyle(sidebarServerList);
+    const playerListStyle = window.getComputedStyle(sidebarPlayerList);
+
+    return {
+      panelBottom: panelRect.bottom,
+      panelHeight: panelRect.height,
+      viewportHeight: window.innerHeight,
+      bodyHeight: body.clientHeight,
+      bodyOverflowY: bodyStyle.overflowY,
+      workspaceColumns: window.getComputedStyle(workspace).gridTemplateColumns,
+      serverSectionHeight: serverSectionRect.height,
+      playerSectionHeight: playerSectionRect.height,
+      serverListOverflowY: serverListStyle.overflowY,
+      playerListOverflowY: playerListStyle.overflowY
+    };
+  });
+
+  expect(layout).toBeDefined();
+  expect(layout?.panelBottom).toBeLessThanOrEqual((layout?.viewportHeight || 0) + 1);
+  expect(layout?.panelHeight).toBeGreaterThan(500);
+  expect(layout?.bodyHeight).toBeGreaterThan(300);
+  expect(layout?.bodyOverflowY).toBe("auto");
+  expect(layout?.serverListOverflowY).toBe("auto");
+  expect(layout?.playerListOverflowY).toBe("auto");
+  expect(Math.abs((layout?.serverSectionHeight || 0) - (layout?.playerSectionHeight || 0))).toBeLessThanOrEqual(1);
+  expect(layout?.workspaceColumns.trim().split(" ").length).toBe(1);
+
+  await page.getByTestId("gm-server-search").fill("归档");
+  await expect(page.locator(".gm-sidebar__server-card")).toHaveCount(1);
+  await expect(page.getByTestId("gm-server-card-relay-backup-c-archive-test")).toBeVisible();
+
+  await page.getByTestId("gm-player-search").fill("爱马仕");
+  await expect(page.locator(".gm-sidebar__player-card")).toHaveCount(1);
+  await expect(page.getByTestId("gm-player-card-relay-home-a-survival-main-preview-player-1")).toBeVisible();
 });
 
 test("gm desktop preview sends a broadcast and private message to the selected player", async ({ page }, testInfo) => {
