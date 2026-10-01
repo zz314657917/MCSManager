@@ -18,11 +18,8 @@ export default defineConfig({
           if (path.includes("node_modules/ant-design-vue")) {
             return "ant";
           }
-          if (path.includes("node_modules/zrender")) {
-            return "zrender";
-          }
-          if (path.includes("node_modules/echarts")) {
-            return "echart";
+          if (path.includes("node_modules/echarts") || path.includes("node_modules/zrender")) {
+            return "echarts";
           }
           if (path.includes("node_modules/lodash")) {
             return "lodash";

@@ -2,7 +2,7 @@
 title: Known Pitfalls
 type: pitfalls
 repo: MCSManager-monitor
-last_verified: 2026-04-20
+last_verified: 2026-08-14
 ---
 
 # 前端与路由
@@ -28,6 +28,7 @@ last_verified: 2026-04-20
 - `frontend/dist/` 是构建产物，通常不应进入源码提交
 - `frontend` 的 `npm run lint` 会自动改文件
 - 某些环境里 `rg` 可能不可用，准备好回退方案
+- ECharts 6.x 与 ZRender 不能被 `manualChunks` 拆到不同产物；否则生产环境可能报 `zrender is not a function`。在 `frontend/vite.config.ts` 中将两者统一映射到同一个 `echarts` chunk，并以 `npm.cmd run build-only`、产物检查及浏览器动态导入复验。
 
 # 类型和字段
 - 监控接口字段改动最容易造成前后端字段漂移

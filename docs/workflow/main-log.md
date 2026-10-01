@@ -14,6 +14,8 @@
 260731 00:02 | gm-chat-economy-write-operations | qa-pass | Codex | docs/workflow/gm-chat-economy-write-operations-qa.md
 260731 11:58 | gm-chat-economy-write-operations | arclight-1201-runtime-smoke-pass | Codex | docs/workflow/gm-chat-economy-write-operations-qa.md
 260731 18:09 | gm-chat-economy-write-operations | scoped-publish-pass | Codex | zzrepo/master@2cfbe33f
+260814 1420 | echarts-zrender-chunk-runtime-fix | contract-approved | Codex | docs/workflow/tasks/echarts-zrender-chunk-runtime-fix-contract.md
+260814 1430 | echarts-zrender-chunk-runtime-fix | qa-pass | Codex | docs/workflow/echarts-zrender-chunk-runtime-fix-qa.md
 260824 1519 | gm-chat-navigation-merge | contract-draft | Codex | docs/workflow/tasks/gm-chat-navigation-merge-contract.md
 260824 1523 | gm-chat-navigation-merge | contract-approved | Codex | docs/workflow/gm-chat-navigation-merge-review.md
 260824 1524 | gm-chat-navigation-merge | contract-amendment-approved | Codex | docs/workflow/gm-chat-navigation-merge-review.md
