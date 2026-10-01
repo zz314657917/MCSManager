@@ -50,6 +50,7 @@ import {
   AppstoreOutlined,
   BuildOutlined,
   CloudServerOutlined,
+  CloseOutlined,
   CodeOutlined,
   ControlOutlined,
   DashboardOutlined,
@@ -90,6 +91,7 @@ const instanceFundamentalDetailDialog = ref<InstanceType<typeof InstanceFundamen
 const ALL_CONTROL_TARGETS_FILTER = "__all_control_targets__";
 const BATCH_OPERATION_DANGER_ACTIONS = new Set<ControlBatchAction>(["stop", "kill"]);
 const targetFilterDaemonId = ref(ALL_CONTROL_TARGETS_FILTER);
+const openTargetKeys = ref<string[]>([]);
 const currentInstanceDetail = ref<InstanceDetail>();
 const batchSelectedTargetKeys = ref<string[]>([]);
 const isBatchOperating = ref(false);
@@ -259,6 +261,15 @@ const orderedCurrentTargets = computed(() => {
 
 const batchSelectedTargetKeySet = computed(() => new Set(batchSelectedTargetKeys.value));
 const allTargets = computed(() => nodes.value.flatMap((node) => node.targets));
+const openTargets = computed(() => {
+  const targetsByKey = new Map(
+    allTargets.value.map((target) => [createControlTargetKey(target), target] as const)
+  );
+
+  return openTargetKeys.value
+    .map((key) => targetsByKey.get(key))
+    .filter((target): target is ControlTarget => Boolean(target));
+});
 const selectableBatchTargets = computed(() =>
   allTargets.value.filter((target) => target.mode === "instance")
 );
@@ -314,10 +325,29 @@ const closeMobileSelector = () => {
 };
 
 const handleSelectTarget = (target: ControlTarget) => {
+  const targetKey = createControlTargetKey(target);
+  if (!openTargetKeys.value.includes(targetKey)) {
+    openTargetKeys.value = [...openTargetKeys.value, targetKey];
+  }
   selectTarget(target);
   if (isPhone.value) {
     closeMobileSelector();
   }
+};
+
+const handleCloseTargetTab = (target: ControlTarget) => {
+  const targetKey = createControlTargetKey(target);
+  const tabIndex = openTargetKeys.value.indexOf(targetKey);
+  if (tabIndex < 0) return;
+
+  const nextOpenKeys = openTargetKeys.value.filter((key) => key !== targetKey);
+  openTargetKeys.value = nextOpenKeys;
+
+  if (currentTargetKey.value !== targetKey || !nextOpenKeys.length) return;
+
+  const nextKey = nextOpenKeys[Math.min(tabIndex, nextOpenKeys.length - 1)];
+  const nextTarget = allTargets.value.find((item) => createControlTargetKey(item) === nextKey);
+  if (nextTarget) selectTarget(nextTarget);
 };
 
 const handleToggleBatchSelection = (target: ControlTarget) => {
@@ -367,7 +397,7 @@ const handleChangeTargetFilter = (daemonId: string) => {
 
   const nextTarget = nodes.value.find((node) => node.daemonId === daemonId)?.targets[0];
   if (nextTarget) {
-    selectTarget(nextTarget);
+    handleSelectTarget(nextTarget);
   }
 };
 
@@ -950,6 +980,10 @@ watch(isAdmin, (admin) => {
 watch(
   () => currentTargetKey.value,
   async () => {
+    if (currentTargetKey.value && !openTargetKeys.value.includes(currentTargetKey.value)) {
+      openTargetKeys.value = [...openTargetKeys.value, currentTargetKey.value];
+    }
+
     if (currentTarget.value?.mode !== "instance") {
       currentInstanceDetail.value = undefined;
       return;
@@ -1046,43 +1080,6 @@ onUnmounted(() => {
         </a-button>
       </template>
 
-      <section v-if="!isPhone && currentTarget" class="control-console__desktop-toolbar">
-        <div class="control-console__desktop-toolbar-main">
-          <div class="control-console__desktop-toolbar-title-wrap">
-            <div class="control-console__desktop-toolbar-eyebrow">{{ controlEyebrow }}</div>
-            <div class="control-console__desktop-toolbar-title">{{ t("TXT_CODE_CONTROL_TITLE") }}</div>
-          </div>
-          <div class="control-console__desktop-toolbar-pills">
-            <div class="control-console__header-pill">
-              <CloudServerOutlined />
-              <span>{{ currentNode?.daemonDisplayName }}</span>
-            </div>
-            <div class="control-console__header-pill control-console__header-pill--accent">
-              <DesktopOutlined />
-              <span>{{ currentTargetTitle }}</span>
-            </div>
-            <a-tag class="control-console__mode-tag" :bordered="false">
-              {{ currentTargetModeText }}
-            </a-tag>
-          </div>
-        </div>
-
-        <div class="control-console__desktop-toolbar-actions">
-          <a-button @click="openLegacyInstancePage">
-            <template #icon>
-              <AppstoreOutlined />
-            </template>
-            <span>{{ t("TXT_CODE_CONTROL_INSTANCE_PAGE") }}</span>
-          </a-button>
-          <a-button :loading="isRefreshBusy" @click="handleRefresh">
-            <template #icon>
-              <ReloadOutlined />
-            </template>
-            <span>{{ t("TXT_CODE_REFRESH") }}</span>
-          </a-button>
-        </div>
-      </section>
-
       <template #mobile-prelude>
         <section v-if="isPhone && currentTarget" class="control-console__mobile-switcher">
           <button
@@ -1142,6 +1139,46 @@ onUnmounted(() => {
           @edit-target-note="handleEditTargetNote"
         />
       </template>
+
+      <section
+        v-if="openTargets.length"
+        class="control-console__target-tabs"
+        data-testid="control-target-tabs"
+        aria-label="已打开的控制页面"
+      >
+        <div class="control-console__target-tabs-scroll">
+          <button
+            v-for="target in openTargets"
+            :key="createControlTargetKey(target)"
+            type="button"
+            class="control-console__target-tab"
+            :class="{
+              'is-active': currentTargetKey === createControlTargetKey(target)
+            }"
+            :data-testid="`control-target-tab-${target.daemonId}-${target.mode}-${target.instanceId}`"
+            @click="handleSelectTarget(target)"
+          >
+            <span
+              class="control-console__target-tab-status"
+              :class="`is-${getControlTargetStatusColor(target)}`"
+            />
+            <span class="control-console__target-tab-copy">
+              <strong>{{ getTargetNote(target) || target.displayName }}</strong>
+            </span>
+            <span
+              class="control-console__target-tab-close"
+              role="button"
+              tabindex="0"
+              aria-label="关闭控制页面"
+              @click.stop="handleCloseTargetTab(target)"
+              @keydown.enter.stop="handleCloseTargetTab(target)"
+              @keydown.space.prevent.stop="handleCloseTargetTab(target)"
+            >
+              <CloseOutlined />
+            </span>
+          </button>
+        </div>
+      </section>
 
       <div
         v-if="currentTarget"
@@ -1388,30 +1425,33 @@ onUnmounted(() => {
               <a-empty v-else-if="currentLogs.length > 0 && filteredLogs.length === 0" class="control-console__terminal-empty" :description="t('TXT_CODE_CONTROL_SEARCH_LOGS')" />
               <a-empty v-else class="control-console__terminal-empty" :description="t('TXT_CODE_5415f009')" />
             </div>
-          </div>
-
-          <div class="control-console__terminal-input" data-testid="control-terminal-input-row">
-            <a-input
-              ref="commandInputRef"
-              v-model:value="commandInput"
-              :disabled="!currentTarget.daemonAvailable"
-              :placeholder="commandPlaceholder"
-              data-testid="control-command-input"
-              @press-enter="handleSendCommandWithHistory"
-              @keydown.up.prevent="handleCommandHistoryUp"
-              @keydown.down.prevent="handleCommandHistoryDown"
-            />
-            <a-button
-              type="primary"
-              :disabled="!commandInput.trim()"
-              data-testid="control-command-send"
-              @click="handleSendCommandWithHistory"
-            >
-              <template #icon>
-                <SendOutlined />
-              </template>
-              {{ t("TXT_CODE_b7cab91d") }}
-            </a-button>
+            <div class="control-console__terminal-input" data-testid="control-terminal-input-row">
+              <a-input
+                ref="commandInputRef"
+                v-model:value="commandInput"
+                :disabled="!currentTarget.daemonAvailable"
+                :placeholder="`${commandPlaceholder}  (↑↓ 历史，Enter 发送)`"
+                data-testid="control-command-input"
+                @press-enter="handleSendCommandWithHistory"
+                @keydown.up.prevent="handleCommandHistoryUp"
+                @keydown.down.prevent="handleCommandHistoryDown"
+              >
+                <template #prefix>
+                  <span class="control-console__terminal-prompt">&gt;</span>
+                </template>
+              </a-input>
+              <a-button
+                type="primary"
+                :disabled="!commandInput.trim()"
+                data-testid="control-command-send"
+                aria-label="发送命令"
+                @click="handleSendCommandWithHistory"
+              >
+                <template #icon>
+                  <SendOutlined />
+                </template>
+              </a-button>
+            </div>
           </div>
 
           <div
@@ -1729,6 +1769,109 @@ onUnmounted(() => {
   color: var(--color-primary);
 }
 
+.control-console__target-tabs {
+  min-width: 0;
+  padding: 0;
+}
+
+.control-console__target-tabs-scroll {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.control-console__target-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 140px;
+  max-width: 220px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--card-border-color);
+  border-radius: 10px 10px 0 0;
+  background: var(--design-canvas-soft);
+  color: var(--design-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.control-console__target-tab:hover,
+.control-console__target-tab.is-active {
+  border-color: var(--color-blue-5);
+  background: var(--background-color-white);
+  color: var(--design-ink);
+}
+
+.control-console__target-tab.is-active {
+  box-shadow: inset 0 2px 0 var(--color-blue-6);
+}
+
+.control-console__target-tab-status {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-gray-6);
+}
+
+.control-console__target-tab-status.is-success {
+  background: var(--color-green-6);
+}
+
+.control-console__target-tab-status.is-processing {
+  background: var(--color-gold-6);
+}
+
+.control-console__target-tab-status.is-error {
+  background: var(--color-red-6);
+}
+
+.control-console__target-tab-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  min-width: 0;
+  gap: 2px;
+}
+
+.control-console__target-tab-copy strong,
+.control-console__target-tab-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-console__target-tab-copy strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.control-console__target-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  color: var(--design-muted);
+}
+
+.control-console__target-tab-close:hover,
+.control-console__target-tab-close:focus-visible {
+  background: var(--design-canvas-soft);
+  color: var(--design-ink);
+}
+
 .control-console__mobile-switcher {
   padding: 10px 12px 0;
 }
@@ -1830,7 +1973,7 @@ onUnmounted(() => {
   .control-console :deep(.ops-page-shell--desktop-embedded .ops-page-shell__workspace) {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 6px;
     height: 100%;
     min-height: 0;
     overflow: hidden;
@@ -2435,7 +2578,7 @@ onUnmounted(() => {
 }
 
 .control-console__terminal-meta {
-  color: var(--color-gray-7);
+  color: #93c5fd;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -2460,13 +2603,23 @@ onUnmounted(() => {
 }
 
 .control-console__terminal-search :deep(.ant-input) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(148, 163, 184, 0.18);
-  color: #dbeafe;
+  background: #050b14;
+  border-color: rgba(148, 163, 184, 0.32);
+  color: #f8fafc;
+}
+
+.control-console__terminal-search :deep(.ant-input-affix-wrapper) {
+  background: #050b14;
+  border-color: rgba(148, 163, 184, 0.32);
+  box-shadow: none;
 }
 
 .control-console__terminal-search :deep(.ant-input::placeholder) {
-  color: rgba(191, 219, 254, 0.45);
+  color: #94a3b8;
+}
+
+.control-console__terminal-search :deep(.ant-input-prefix) {
+  color: #93c5fd;
 }
 
 .control-console__log-level-filters {
@@ -2492,11 +2645,43 @@ onUnmounted(() => {
 }
 
 .control-console__log-level-filter :deep(.ant-segmented-item) {
-  color: rgba(191, 219, 254, 0.7);
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.control-console__log-level-filter :deep(.ant-segmented) {
+  background: #050b14;
+  border: 1px solid #475569;
 }
 
 .control-console__log-level-filter :deep(.ant-segmented-item-selected) {
-  background: rgba(59, 130, 246, 0.3);
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.45);
+}
+
+.control-console__terminal-actions :deep(.ant-btn) {
+  border-color: #64748b;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.control-console__terminal-actions :deep(.ant-btn:hover),
+.control-console__terminal-actions :deep(.ant-btn:focus-visible) {
+  border-color: #93c5fd;
+  color: #fff;
+}
+
+.control-console__terminal-actions :deep(.ant-btn-dangerous) {
+  border-color: #f87171;
+  background: rgba(127, 29, 29, 0.3);
+  color: #fecaca;
+}
+
+.control-console__terminal-actions :deep(.ant-btn-dangerous:hover),
+.control-console__terminal-actions :deep(.ant-btn-dangerous:focus-visible) {
+  border-color: #fca5a5;
+  background: #b91c1c;
   color: #fff;
 }
 
@@ -2561,8 +2746,57 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  padding: 16px 18px 18px;
+  padding: 10px 14px 12px;
   border-top: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(4, 12, 24, 0.82);
+}
+
+.control-console__terminal-input :deep(.ant-input-affix-wrapper) {
+  border-color: #64748b;
+  background: #050b14;
+  box-shadow: none;
+}
+
+.control-console__terminal-input :deep(.ant-input-affix-wrapper:hover),
+.control-console__terminal-input :deep(.ant-input-affix-wrapper-focused) {
+  border-color: #60a5fa;
+  background: #050b14;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.14);
+}
+
+.control-console__terminal-input :deep(.ant-input) {
+  color: #f8fafc;
+  font-family: Consolas, "SFMono-Regular", Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
+}
+
+.control-console__terminal-input :deep(.ant-input::placeholder) {
+  color: #94a3b8;
+}
+
+.control-console__terminal-input :deep(.ant-btn-primary) {
+  min-width: 48px;
+  border-color: #60a5fa;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+}
+
+.control-console__terminal-input :deep(.ant-btn-primary:not(:disabled):hover),
+.control-console__terminal-input :deep(.ant-btn-primary:not(:disabled):focus-visible) {
+  border-color: #bfdbfe;
+  background: #3b82f6;
+}
+
+.control-console__terminal-input :deep(.ant-btn-primary:disabled) {
+  border-color: #334155;
+  background: #1e293b;
+  color: #64748b;
+}
+
+.control-console__terminal-prompt {
+  color: #4ade80;
+  font-family: Consolas, "SFMono-Regular", Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
+  font-weight: 700;
 }
 
 .control-console__empty-panel {
@@ -2583,6 +2817,96 @@ onUnmounted(() => {
 .control-console__actions-slot {
   order: 3;
   flex-shrink: 0;
+}
+
+/* Keep the control surface focused on target, status, logs and actions. */
+.control-console :deep(.control-target-selector__target-meta-row) {
+  display: none;
+}
+
+.control-console :deep(.control-target-selector__card) {
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.control-console :deep(.control-target-selector__list) {
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+
+.control-console :deep(.control-target-selector .control-panel__header) {
+  padding: 12px 12px 8px;
+}
+
+.control-console :deep(.control-target-selector__target-row) {
+  gap: 6px;
+}
+
+.control-console :deep(.control-target-selector__target-actions) {
+  gap: 0;
+}
+
+.control-console :deep(.control-target-selector__edit-button) {
+  display: none;
+}
+
+@media (min-width: 993px) {
+  .control-console :deep(.control-target-selector:not(.control-target-selector--drawer)) {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+  }
+
+  .control-console :deep(.control-target-selector:not(.control-target-selector--drawer) .control-panel--targets) {
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+  }
+}
+
+.control-console .control-console__summary-desc,
+.control-console .control-console__summary-meta {
+  display: none;
+}
+
+.control-console .control-panel__header {
+  padding: 12px 14px 8px;
+}
+
+.control-console .control-console__summary-top {
+  padding: 0 14px 8px;
+}
+
+.control-console .control-console__summary-title {
+  margin-top: 2px;
+  font-size: 20px;
+}
+
+.control-console .control-console__metrics-grid {
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.control-console .control-console__metric-card {
+  min-height: 76px;
+  padding: 9px 10px;
+  gap: 4px;
+}
+
+.control-console .control-console__metric-value {
+  font-size: 18px;
+}
+
+.control-console .control-console__players-section {
+  padding: 0 14px;
+}
+
+.control-console .control-console__terminal-toolbar {
+  padding: 10px 14px;
+}
+
+.control-console .control-console__log-level-filters {
+  padding: 6px 14px;
 }
 
 @media (max-width: 992px) {
