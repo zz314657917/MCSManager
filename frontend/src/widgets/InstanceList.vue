@@ -369,10 +369,10 @@ const getMonitorSnapshot = (item: InstanceListItem) => {
 const getInstancePlayersText = (item: InstanceListItem) => {
   const monitor = getMonitorSnapshot(item);
   if (monitor?.plugin?.online) {
-    return `${monitor.plugin.onlinePlayers} / ${monitor.plugin.maxPlayers}`;
+    return `${monitor.plugin.onlinePlayers}人`;
   }
   if (item.info?.mcPingOnline) {
-    return `${item.info.currentPlayers} / ${item.info.maxPlayers}`;
+    return `${item.info.currentPlayers}人`;
   }
   return "--";
 };
